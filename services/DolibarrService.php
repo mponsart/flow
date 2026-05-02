@@ -14,6 +14,7 @@ class DolibarrService
             : $dolibarrUrl . '/api/index.php';
         $this->apiKey  = DOLIBARR_API_KEY;
         $this->pdo     = getDB();
+        $this->ensureSyncSchema();
     }
 
     public function syncAll(): array
@@ -127,6 +128,7 @@ class DolibarrService
     {
         $logId = $this->startLog('invoices');
         $processed = 0;
+        $lineCount  = 0;
         $failed    = 0;
         $status    = 'success';
         $message   = 'Sync invoices OK';
@@ -149,7 +151,7 @@ class DolibarrService
 
                 foreach ($data as $item) {
                     try {
-                        $this->upsertInvoice($item);
+                        $lineCount += $this->upsertInvoice($item);
                         $processed++;
                     } catch (Throwable $e) {
                         error_log('syncInvoices item error: ' . $e->getMessage());
@@ -162,6 +164,8 @@ class DolibarrService
             if ($failed > 0) {
                 $status = 'warning';
                 $message = "Sync invoices terminée avec $failed erreur(s)";
+            } else {
+                $message = "Sync invoices OK ($lineCount ligne(s))";
             }
             $this->setLastSync('invoices');
         } catch (Throwable $e) {
@@ -333,6 +337,26 @@ class DolibarrService
         return $data !== [];
     }
 
+    private function ensureSyncSchema(): void
+    {
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT COUNT(*)
+                 FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = "products"
+                   AND INDEX_NAME = "uq_products_ref_type"'
+            );
+            $stmt->execute();
+
+            if ((int)$stmt->fetchColumn() === 0) {
+                $this->pdo->exec('ALTER TABLE products ADD UNIQUE KEY uq_products_ref_type (ref, type)');
+            }
+        } catch (Throwable $e) {
+            error_log('ensureSyncSchema error: ' . $e->getMessage());
+        }
+    }
+
     private function isOptionalAccessError(Throwable $e): bool
     {
         return str_contains($e->getMessage(), 'HTTP 403');
@@ -406,9 +430,9 @@ class DolibarrService
         ]);
     }
 
-    private function upsertInvoice(array $data): void
+    private function upsertInvoice(array $data): int
     {
-        if (empty($data['id'])) return;
+        if (empty($data['id'])) return 0;
 
         // Resolve tiers_id
         $tiersId = null;
@@ -450,26 +474,32 @@ class DolibarrService
         $invStmt->execute([$data['id']]);
         $inv = $invStmt->fetch();
         if ($inv) {
-            $this->syncInvoiceLines((int)$data['id'], (int)$inv['id'], $data['lines'] ?? null);
+            return $this->syncInvoiceLines((int)$data['id'], (int)$inv['id'], $data['lines'] ?? null);
         }
+
+        return 0;
     }
 
-    private function syncInvoiceLines(int $dolibarrInvoiceId, int $localInvoiceId, ?array $lines): void
+    private function syncInvoiceLines(int $dolibarrInvoiceId, int $localInvoiceId, ?array $lines): int
     {
         if ($lines === null) {
             try {
                 $lines = $this->apiGet('/invoices/' . $dolibarrInvoiceId . '/lines');
             } catch (Throwable $e) {
                 error_log('syncInvoiceLines error for invoice ' . $dolibarrInvoiceId . ': ' . $e->getMessage());
-                return;
+                return 0;
             }
         }
 
         $this->pdo->prepare('DELETE FROM invoice_lines WHERE invoice_id = ?')->execute([$localInvoiceId]);
 
+        $count = 0;
         foreach ($lines as $line) {
             $this->upsertInvoiceLine($localInvoiceId, $line);
+            $count++;
         }
+
+        return $count;
     }
 
     private function upsertInvoiceLine(int $invoiceId, array $line): void
@@ -484,6 +514,8 @@ class DolibarrService
             if (!$productId) {
                 $productId = $this->upsertServiceFromInvoiceLine($line);
             }
+        } else {
+            $productId = $this->upsertServiceFromInvoiceLine($line);
         }
 
         $stmt = $this->pdo->prepare(
@@ -504,12 +536,16 @@ class DolibarrService
     private function upsertServiceFromInvoiceLine(array $line): ?int
     {
         $dolibarrProductId = (int)($line['fk_product'] ?? 0);
-        if ($dolibarrProductId <= 0) {
+        $label = $line['product_label'] ?? $line['label'] ?? $line['desc'] ?? ('Service #' . $dolibarrProductId);
+        $label = trim(strip_tags((string)$label));
+        if ($label === '') {
             return null;
         }
 
-        $label = $line['product_label'] ?? $line['label'] ?? $line['desc'] ?? ('Service #' . $dolibarrProductId);
-        $ref = $line['product_ref'] ?? $line['ref'] ?? ('DOL-' . $dolibarrProductId);
+        $ref = $line['product_ref'] ?? $line['ref'] ?? '';
+        if (!$ref) {
+            $ref = $dolibarrProductId > 0 ? 'DOL-' . $dolibarrProductId : 'LINE-' . substr(sha1($label), 0, 12);
+        }
 
         $this->pdo->prepare(
             'INSERT INTO products (dolibarr_id, ref, label, price, type, created_at, updated_at)
@@ -517,15 +553,20 @@ class DolibarrService
              ON DUPLICATE KEY UPDATE
                ref=VALUES(ref), label=VALUES(label), price=VALUES(price), type=VALUES(type), updated_at=NOW()'
         )->execute([
-            'did'   => $dolibarrProductId,
+            'did'   => $dolibarrProductId > 0 ? $dolibarrProductId : null,
             'ref'   => substr($ref, 0, 100),
             'label' => substr($label, 0, 255),
             'price' => (float)($line['subprice'] ?? 0),
             'type'  => 1,
         ]);
 
-        $stmt = $this->pdo->prepare('SELECT id FROM products WHERE dolibarr_id = ?');
-        $stmt->execute([$dolibarrProductId]);
+        if ($dolibarrProductId > 0) {
+            $stmt = $this->pdo->prepare('SELECT id FROM products WHERE dolibarr_id = ?');
+            $stmt->execute([$dolibarrProductId]);
+        } else {
+            $stmt = $this->pdo->prepare('SELECT id FROM products WHERE ref = ? AND type = 1');
+            $stmt->execute([substr($ref, 0, 100)]);
+        }
         $id = $stmt->fetchColumn();
 
         return $id ? (int)$id : null;

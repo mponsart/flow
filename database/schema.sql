@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS `products` (
   `updated_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_products_dolibarr` (`dolibarr_id`),
+  UNIQUE KEY `uq_products_ref_type` (`ref`, `type`),
   KEY `idx_products_ref` (`ref`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

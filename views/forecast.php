@@ -76,6 +76,49 @@
 
     <div class="charts-grid">
 
+      <div class="card" style="grid-column:1/-1;">
+        <p class="card-title">
+          <span class="material-icons" style="vertical-align:middle;font-size:1rem;">repeat</span>
+          Factures récurrentes détectées
+        </p>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tiers</th>
+              <th>Service</th>
+              <th>Fréquence</th>
+              <th>Montant moyen</th>
+              <th>Dernière facture</th>
+              <th>Prochaine échéance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php if (empty($data['recurring'])): ?>
+            <tr>
+              <td colspan="6" style="text-align:center;color:#5f6368;padding:2rem;">
+                Aucune récurrence mensuelle, trimestrielle ou annuelle détectée.
+              </td>
+            </tr>
+            <?php else: ?>
+            <?php foreach (array_slice($data['recurring'], 0, 12) as $item): ?>
+            <tr>
+              <td><?= htmlspecialchars($item['tiers_name'], ENT_QUOTES, 'UTF-8') ?></td>
+              <td><?= htmlspecialchars($item['service_label'], ENT_QUOTES, 'UTF-8') ?></td>
+              <td>
+                <span class="badge badge-info">
+                  <?= htmlspecialchars($item['period_label'], ENT_QUOTES, 'UTF-8') ?>
+                </span>
+              </td>
+              <td style="font-weight:500;"><?= number_format((float)$item['amount'], 0, ',', ' ') ?> €</td>
+              <td><?= htmlspecialchars(date('d/m/Y', strtotime($item['last_date'])), ENT_QUOTES, 'UTF-8') ?></td>
+              <td><?= htmlspecialchars(date('d/m/Y', strtotime($item['next_date'])), ENT_QUOTES, 'UTF-8') ?></td>
+            </tr>
+            <?php endforeach; ?>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+
       <!-- 3 and 6 month projections -->
       <?php if (!empty($data['proj3']['labels'])): ?>
       <div class="card">
