@@ -1,11 +1,12 @@
 <?php
 $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $navItems = [
-    ['path' => '/',        'icon' => 'dashboard',     'label' => 'Tableau de bord'],
-    ['path' => '/tiers',   'icon' => 'groups',        'label' => 'Tiers'],
-    ['path' => '/payments','icon' => 'payments',      'label' => 'Paiements'],
-    ['path' => '/forecast','icon' => 'trending_up',   'label' => 'Prévisions'],
-    ['path' => '/sync',    'icon' => 'sync',          'label' => 'Synchronisation'],
+    ['path' => '/',          'icon' => 'dashboard',            'label' => 'Tableau de bord'],
+    ['path' => '/tiers',     'icon' => 'groups',               'label' => 'Tiers'],
+    ['path' => '/payments',  'icon' => 'payments',             'label' => 'Paiements'],
+    ['path' => '/forecast',  'icon' => 'trending_up',          'label' => 'Prévisions'],
+    ['path' => '/expenses',  'icon' => 'account_balance_wallet','label' => 'Dépenses'],
+    ['path' => '/sync',      'icon' => 'sync',                 'label' => 'Synchronisation'],
 ];
 ?>
 <nav id="sidebar">

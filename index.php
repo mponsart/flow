@@ -130,6 +130,38 @@ switch (true) {
         (new ForecastController())->index();
         break;
 
+    // Expenses
+    case $requestUri === '/expenses' && $method === 'GET':
+        require_once __DIR__ . '/models/BaseModel.php';
+        require_once __DIR__ . '/models/Expense.php';
+        loadClass('ExpensesController');
+        (new ExpensesController())->index();
+        break;
+
+    case $requestUri === '/expenses/store' && $method === 'POST':
+        validateCsrf();
+        require_once __DIR__ . '/models/BaseModel.php';
+        require_once __DIR__ . '/models/Expense.php';
+        loadClass('ExpensesController');
+        (new ExpensesController())->store();
+        break;
+
+    case preg_match('#^/expenses/update/(\d+)$#', $requestUri, $m) && $method === 'POST':
+        validateCsrf();
+        require_once __DIR__ . '/models/BaseModel.php';
+        require_once __DIR__ . '/models/Expense.php';
+        loadClass('ExpensesController');
+        (new ExpensesController())->update((int)$m[1]);
+        break;
+
+    case preg_match('#^/expenses/delete/(\d+)$#', $requestUri, $m) && $method === 'POST':
+        validateCsrf();
+        require_once __DIR__ . '/models/BaseModel.php';
+        require_once __DIR__ . '/models/Expense.php';
+        loadClass('ExpensesController');
+        (new ExpensesController())->destroy((int)$m[1]);
+        break;
+
     // Sync
     case $requestUri === '/sync' && $method === 'GET':
         require_once __DIR__ . '/services/DolibarrService.php';

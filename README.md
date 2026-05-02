@@ -147,10 +147,45 @@ Sur cPanel : **Tâches Cron** dans le panneau de contrôle.
 - Évolution mensuelle des encaissements
 
 ### Prévisions
-- Moyennes mobiles 3 et 6 mois
-- Projections 3 / 6 / 12 mois (régression linéaire)
-- Score de santé financière
-- Indicateur de tendance
+
+Le moteur de prévision (`ForecastService`) combine deux approches complémentaires.
+
+#### 1. Historique et moyennes mobiles
+Les 18 derniers mois de factures **payées** (statut 2) sont chargés. Deux moyennes mobiles sont calculées sur ces revenus réels :
+- **MA3** : moyenne glissante sur 3 mois (réactivité)
+- **MA6** : moyenne glissante sur 6 mois (lissage du bruit)
+
+#### 2. Régression linéaire
+Une droite de tendance est ajustée sur l'historique (moindres carrés). Elle est extrapolée sur 3, 6 ou 12 mois pour produire une projection *linéaire*. Si les revenus sont tous nuls (base vide), la projection linéaire vaut 0.
+
+#### 3. Détection des factures récurrentes
+Les factures payées sont regroupées par couple **(tiers × libellé produit)**. Pour chaque groupe, les intervalles en jours entre factures consécutives sont calculés, puis classifiés :
+
+| Intervalle moyen | Périodicité détectée |
+|---|---|
+| 20 – 50 jours | Mensuelle |
+| 75 – 115 jours | Trimestrielle |
+| 300 – 420 jours | Annuelle |
+| Hors plages | Irrégulière (ignorée) |
+
+Pour chaque récurrence détectée, les prochaines occurrences sont projetées sur la fenêtre demandée et leur montant moyen est ajouté mois par mois.
+
+> **Tolérance** : un client facturé mensuellement mais avec quelques jours de décalage d'un mois à l'autre reste correctement classifié en « mensuel » — la plage 20-50 jours absorbe les variations normales de durée de mois et les légers retards.
+
+#### 4. Projection finale
+La valeur projetée retenue pour chaque mois est le **maximum** entre la projection linéaire et la projection récurrente, afin de ne jamais sous-estimer un revenu contractuel certain.
+
+#### 5. Score de santé financière (0-100)
+Calculé à partir de trois indicateurs pondérés :
+
+| Indicateur | Poids | Calcul |
+|---|---|---|
+| Tendance du CA (6 mois) | 40 % | hausse=100, stable=60, baisse=20 |
+| Taux de factures payées | 40 % | `payées / total × 100` |
+| Absence de retards | 20 % | `100 − (nb en retard × 10)` |
+
+#### 6. Indicateur de tendance
+Comparaison du premier et du dernier mois sur les 3 derniers mois réels : +5% → `up`, −5% → `down`, sinon `stable`.
 
 ### Synchronisation
 - Statut par entité et date de dernière sync

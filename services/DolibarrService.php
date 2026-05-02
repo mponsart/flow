@@ -201,11 +201,9 @@ class DolibarrService
                 try {
                     $data = $this->apiGet('/invoices/' . (int)$invoice['dolibarr_id'] . '/payments');
                 } catch (Throwable $e) {
-                    if ($this->isMissingPaymentList($e)) {
-                        continue;
-                    }
-
-                    throw $e;
+                    error_log('syncPayments fetch error for invoice dolibarr_id=' . $invoice['dolibarr_id'] . ': ' . $e->getMessage());
+                    $failed++;
+                    continue;
                 }
 
                 if (empty($data)) {
