@@ -26,6 +26,55 @@ class DashboardController
         $unpaidAmount  = (float)$kpiService->getUnpaidAmount();
         $overdueAmount = (float)$kpiService->getOverdueAmount();
 
+        $unpaidAmountYear = 0.0;
+        $overdueAmountYear = 0.0;
+        $top1SharePct = 0.0;
+        $top3SharePct = 0.0;
+        try {
+            $pdo = getDB();
+
+            $stmt = $pdo->prepare(
+                'SELECT COALESCE(SUM(total_ttc), 0)
+                 FROM invoices
+                 WHERE status IN (0,1)
+                   AND YEAR(date_invoice) = ?'
+            );
+            $stmt->execute([$year]);
+            $unpaidAmountYear = (float)$stmt->fetchColumn();
+
+            $stmt = $pdo->prepare(
+                'SELECT COALESCE(SUM(total_ttc), 0)
+                 FROM invoices
+                 WHERE is_overdue = 1
+                   AND YEAR(date_invoice) = ?'
+            );
+            $stmt->execute([$year]);
+            $overdueAmountYear = (float)$stmt->fetchColumn();
+
+            $stmt = $pdo->prepare(
+                'SELECT tiers_id, COALESCE(SUM(amount), 0) AS revenue
+                 FROM payments
+                 WHERE tiers_id IS NOT NULL
+                   AND YEAR(date_payment) = ?
+                 GROUP BY tiers_id
+                 ORDER BY revenue DESC
+                 LIMIT 3'
+            );
+            $stmt->execute([$year]);
+            $topCashRows = $stmt->fetchAll();
+
+            if (!empty($topCashRows) && $annualRevenue > 0) {
+                $top1SharePct = round(((float)$topCashRows[0]['revenue'] / $annualRevenue) * 100, 1);
+                $top3Revenue = 0.0;
+                foreach ($topCashRows as $row) {
+                    $top3Revenue += (float)$row['revenue'];
+                }
+                $top3SharePct = round(($top3Revenue / $annualRevenue) * 100, 1);
+            }
+        } catch (Throwable $e) {
+            error_log('Dashboard yearly consistency metrics unavailable: ' . $e->getMessage());
+        }
+
         $annualExpenses = 0.0;
         $monthlyExpenses = 0.0;
         $expenseCategories = [];
@@ -46,11 +95,11 @@ class DashboardController
         $monthlyProfit  = $monthlyRevenue - $monthlyExpenses;
         $marginPct      = $annualRevenue > 0 ? round(($annualProfit / $annualRevenue) * 100, 1) : 0.0;
         $expenseRatePct = $annualRevenue > 0 ? round(($annualExpenses / $annualRevenue) * 100, 1) : 0.0;
-        $overdueRiskPct = $annualRevenue > 0 ? round(($overdueAmount / $annualRevenue) * 100, 1) : 0.0;
+        $overdueRiskPct = $annualRevenue > 0 ? round(($overdueAmountYear / $annualRevenue) * 100, 1) : 0.0;
 
-        $openAmount = $annualRevenue + $unpaidAmount;
+        $openAmount = $annualRevenue + $unpaidAmountYear;
         $collectionRateAmountPct = $openAmount > 0 ? round(($annualRevenue / $openAmount) * 100, 1) : 0.0;
-        $overdueOnOpenPct = $unpaidAmount > 0 ? round(($overdueAmount / $unpaidAmount) * 100, 1) : 0.0;
+        $overdueOnOpenPct = $unpaidAmountYear > 0 ? round(($overdueAmountYear / $unpaidAmountYear) * 100, 1) : 0.0;
 
         $revenueSeries = array_map(static fn(array $item): float => (float)($item['revenue'] ?? 0), $kpis['revenue_evolution'] ?? []);
         $avgMonthlyRevenue = !empty($revenueSeries) ? array_sum($revenueSeries) / count($revenueSeries) : 0.0;
@@ -65,16 +114,6 @@ class DashboardController
         }
         $stdDev = sqrt($variance);
         $volatilityPct = $avgMonthlyRevenue > 0 ? round(($stdDev / $avgMonthlyRevenue) * 100, 1) : 0.0;
-
-        $topTiers = $kpis['revenue_by_tiers'] ?? [];
-        $top1Revenue = isset($topTiers[0]) ? (float)($topTiers[0]['revenue'] ?? 0) : 0.0;
-        $top3Revenue = 0.0;
-        foreach (array_slice($topTiers, 0, 3) as $row) {
-            $top3Revenue += (float)($row['revenue'] ?? 0);
-        }
-
-        $top1SharePct = $annualRevenue > 0 ? round(($top1Revenue / $annualRevenue) * 100, 1) : 0.0;
-        $top3SharePct = $annualRevenue > 0 ? round(($top3Revenue / $annualRevenue) * 100, 1) : 0.0;
 
         $runwayMonths = null;
         if ($monthlyExpenses > 0 && $monthlyProfit < 0) {
@@ -106,7 +145,8 @@ class DashboardController
                  FROM invoices
                  WHERE is_overdue = 1
                    AND status IN (0,1)
-                   AND date_due IS NOT NULL'
+                     AND date_due IS NOT NULL
+                     AND YEAR(date_invoice) = YEAR(CURDATE())'
             );
             $avgOverdueDays = (float)$stmt->fetchColumn();
 
@@ -115,6 +155,7 @@ class DashboardController
                  FROM invoices
                  WHERE status IN (0,1)
                    AND date_due IS NOT NULL
+                                     AND YEAR(date_invoice) = YEAR(CURDATE())
                    AND date_due >= CURDATE()
                    AND date_due <= DATE_ADD(CURDATE(), INTERVAL 15 DAY)'
             );
@@ -184,6 +225,8 @@ class DashboardController
             'due_soon_amount' => $dueSoonAmount,
             'unpaid_amount'     => $unpaidAmount,
             'overdue_amount'    => $overdueAmount,
+            'unpaid_amount_year' => $unpaidAmountYear,
+            'overdue_amount_year' => $overdueAmountYear,
             'overdue_risk_pct'  => $overdueRiskPct,
             'margin_status'     => $marginStatus,
             'collection_status' => $collectionStatus,

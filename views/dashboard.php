@@ -155,8 +155,8 @@
         </div>
       </div>
       <div style="margin-top:0.9rem;color:#5f6368;font-size:0.85rem;display:flex;gap:1.2rem;flex-wrap:wrap;">
-        <span>Impayés: <strong style="color:#202124;"><?= number_format((float)($annual['unpaid_amount'] ?? 0), 0, ',', ' ') ?> €</strong></span>
-        <span>Retard: <strong style="color:#202124;"><?= number_format((float)($annual['overdue_amount'] ?? 0), 0, ',', ' ') ?> €</strong></span>
+        <span>Impayés année en cours: <strong style="color:#202124;"><?= number_format((float)($annual['unpaid_amount_year'] ?? 0), 0, ',', ' ') ?> €</strong></span>
+        <span>Retard année en cours: <strong style="color:#202124;"><?= number_format((float)($annual['overdue_amount_year'] ?? 0), 0, ',', ' ') ?> €</strong></span>
         <span>Panier moyen: <strong style="color:#202124;"><?= number_format((float)($kpis['average_basket'] ?? 0), 0, ',', ' ') ?> €</strong></span>
       </div>
     </div>
