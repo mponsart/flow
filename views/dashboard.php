@@ -15,48 +15,84 @@
 
   <div id="content">
 
-    <!-- KPI Cards -->
+    <?php $annual = $kpis['annual_summary'] ?? []; ?>
+    <?php if (empty($annual['expenses_available'])): ?>
+      <div style="background:#fff8e1;border:1px solid #ffe08a;color:#8a6d1d;padding:0.75rem 1rem;border-radius:8px;margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;">
+        <span class="material-icons" style="font-size:1.1rem;">warning</span>
+        Les dépenses ne sont pas encore disponibles. Lance la migration SQL pour activer la rentabilité.
+      </div>
+    <?php endif; ?>
+
+    <!-- KPI Cards annuelles -->
     <div class="kpi-grid">
       <div class="kpi-card">
-        <div class="label">CA du mois</div>
-        <div class="value"><?= number_format($kpis['monthly_revenue'], 0, ',', ' ') ?> €</div>
-        <div class="sub">
-          <?php $gr = $kpis['growth_rate']; ?>
-          <?= $gr >= 0 ? '▲' : '▼' ?>
-          <span style="color:<?= $gr >= 0 ? 'var(--success)' : 'var(--error)' ?>">
-            <?= ($gr >= 0 ? '+' : '') . $gr ?> % vs mois précédent
-          </span>
-        </div>
+        <div class="label">CA annuel encaissé</div>
+        <div class="value"><?= number_format((float)($annual['annual_revenue'] ?? 0), 0, ',', ' ') ?> €</div>
+        <div class="sub">Année <?= (int)($annual['year'] ?? date('Y')) ?></div>
       </div>
 
       <div class="kpi-card">
-        <div class="label">CA annuel</div>
-        <div class="value"><?= number_format($kpis['annual_revenue'], 0, ',', ' ') ?> €</div>
-        <div class="sub">Année <?= date('Y') ?></div>
+        <div class="label">Charges annuelles</div>
+        <div class="value" style="color:var(--error);"><?= number_format((float)($annual['annual_expenses'] ?? 0), 0, ',', ' ') ?> €</div>
+        <div class="sub">Mensualisé: <?= number_format((float)($annual['monthly_expenses'] ?? 0), 0, ',', ' ') ?> €/mois</div>
       </div>
 
-      <div class="kpi-card success">
-        <div class="label">Factures payées</div>
-        <div class="value"><?= (int)($kpis['invoice_counts']['paid'] ?? 0) ?></div>
-        <div class="sub">sur <?= (int)($kpis['invoice_counts']['total'] ?? 0) ?> total</div>
+      <div class="kpi-card <?= ((float)($annual['annual_profit'] ?? 0) >= 0) ? 'success' : 'danger' ?>">
+        <div class="label">Résultat annuel</div>
+        <?php $profit = (float)($annual['annual_profit'] ?? 0); ?>
+        <div class="value"><?= ($profit >= 0 ? '+' : '') . number_format($profit, 0, ',', ' ') ?> €</div>
+        <div class="sub"><?= $profit >= 0 ? 'Rentable' : 'Déficitaire' ?></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="label">Marge nette</div>
+        <?php $margin = (float)($annual['margin_pct'] ?? 0); ?>
+        <div class="value" style="color:<?= $margin >= 0 ? 'var(--success)' : 'var(--error)' ?>;"><?= ($margin >= 0 ? '+' : '') . number_format($margin, 1, ',', ' ') ?> %</div>
+        <div class="sub">Résultat / CA</div>
       </div>
 
       <div class="kpi-card warning">
-        <div class="label">Factures impayées</div>
-        <div class="value"><?= (int)($kpis['invoice_counts']['unpaid'] ?? 0) ?></div>
-        <div class="sub">en attente de règlement</div>
-      </div>
-
-      <div class="kpi-card danger">
-        <div class="label">Factures en retard</div>
-        <div class="value"><?= (int)($kpis['invoice_counts']['overdue'] ?? 0) ?></div>
-        <div class="sub">dépassement d'échéance</div>
+        <div class="label">Taux de charges</div>
+        <div class="value"><?= number_format((float)($annual['expense_rate_pct'] ?? 0), 1, ',', ' ') ?> %</div>
+        <div class="sub">Charges / CA</div>
       </div>
 
       <div class="kpi-card">
-        <div class="label">Panier moyen</div>
-        <div class="value"><?= number_format($kpis['average_basket'], 0, ',', ' ') ?> €</div>
-        <div class="sub">par facture payée</div>
+        <div class="label">Taux de factures payées</div>
+        <div class="value"><?= number_format((float)($annual['paid_rate_pct'] ?? 0), 1, ',', ' ') ?> %</div>
+        <div class="sub"><?= (int)($kpis['invoice_counts']['paid'] ?? 0) ?> payées / <?= (int)($kpis['invoice_counts']['total'] ?? 0) ?> total</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;margin-bottom:1.25rem;">
+      <p class="card-title">
+        <span class="material-icons" style="vertical-align:middle;margin-right:0.25rem;font-size:1rem;">analytics</span>
+        Lecture annuelle rapide
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.875rem;margin-bottom:0.25rem;">
+            <span>Poids des charges</span>
+            <strong><?= number_format((float)($annual['expense_rate_pct'] ?? 0), 1, ',', ' ') ?> %</strong>
+          </div>
+          <div style="height:10px;background:#f1f3f4;border-radius:100px;overflow:hidden;">
+            <div style="height:100%;width:<?= max(0, min(100, (float)($annual['expense_rate_pct'] ?? 0))) ?>%;background:#f9ab00;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.875rem;margin-bottom:0.25rem;">
+            <span>Factures en retard</span>
+            <strong><?= number_format((float)($annual['overdue_rate_pct'] ?? 0), 1, ',', ' ') ?> %</strong>
+          </div>
+          <div style="height:10px;background:#f1f3f4;border-radius:100px;overflow:hidden;">
+            <div style="height:100%;width:<?= max(0, min(100, (float)($annual['overdue_rate_pct'] ?? 0))) ?>%;background:#d93025;"></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:0.9rem;color:#5f6368;font-size:0.85rem;display:flex;gap:1.2rem;flex-wrap:wrap;">
+        <span>Impayés: <strong style="color:#202124;"><?= number_format((float)($annual['unpaid_amount'] ?? 0), 0, ',', ' ') ?> €</strong></span>
+        <span>Retard: <strong style="color:#202124;"><?= number_format((float)($annual['overdue_amount'] ?? 0), 0, ',', ' ') ?> €</strong></span>
+        <span>Panier moyen: <strong style="color:#202124;"><?= number_format((float)($kpis['average_basket'] ?? 0), 0, ',', ' ') ?> €</strong></span>
       </div>
     </div>
 
@@ -67,7 +103,7 @@
       <div class="card" style="grid-column: 1/-1;">
         <p class="card-title">
           <span class="material-icons" style="vertical-align:middle;margin-right:0.25rem;font-size:1rem;">show_chart</span>
-          Évolution du chiffre d'affaires (12 mois)
+          Évolution du chiffre d'affaires encaissé (12 mois)
         </p>
         <div class="chart-container" style="height:300px;">
           <canvas id="revenueChart"></canvas>
@@ -107,10 +143,38 @@
         </div>
       </div>
 
+      <?php if (!empty($annual['expense_categories'])): ?>
+      <div class="card" style="grid-column:1/-1;">
+        <p class="card-title">
+          <span class="material-icons" style="vertical-align:middle;margin-right:0.25rem;font-size:1rem;">account_balance_wallet</span>
+          Répartition des charges mensuelles par catégorie
+        </p>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;">
+          <?php
+            $maxCat = max($annual['expense_categories']) ?: 1;
+            foreach ($annual['expense_categories'] as $cat => $amount):
+              $pct = (float)($annual['monthly_expenses'] ?? 0) > 0 ? round(((float)$amount / (float)$annual['monthly_expenses']) * 100) : 0;
+          ?>
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <div style="width:150px;font-size:0.875rem;flex-shrink:0;"><?= htmlspecialchars((string)$cat, ENT_QUOTES, 'UTF-8') ?></div>
+            <div style="flex:1;height:18px;background:#f1f3f4;border-radius:6px;overflow:hidden;">
+              <div style="height:100%;width:<?= round(((float)$amount / (float)$maxCat) * 100) ?>%;background:#1a73e8;"></div>
+            </div>
+            <div style="width:130px;text-align:right;font-weight:500;font-size:0.875rem;"><?= number_format((float)$amount, 0, ',', ' ') ?> €/mois</div>
+            <div style="width:50px;text-align:right;color:#5f6368;font-size:0.82rem;"><?= $pct ?>%</div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <?php endif; ?>
+
     </div>
 
     <!-- Quick actions -->
     <div class="card" style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
+      <a href="<?= APP_URL ?>/expenses" class="btn btn-outline">
+        <span class="material-icons" style="font-size:1rem;">account_balance_wallet</span> Gérer les dépenses
+      </a>
       <a href="<?= APP_URL ?>/tiers" class="btn btn-outline">
         <span class="material-icons" style="font-size:1rem;">groups</span> Voir les tiers
       </a>
