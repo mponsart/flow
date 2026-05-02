@@ -1,5 +1,8 @@
 Options -Indexes
 
+# Use PHP 8.5 (cPanel)
+AddHandler application/x-httpd-php85 .php
+
 # Deny access to .env files
 <FilesMatch "^\.env">
     Order allow,deny

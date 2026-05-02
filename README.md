@@ -156,7 +156,7 @@ Sur cPanel : **Tâches Cron** dans le panneau de contrôle.
 
 ## Compatibilité
 
-- PHP 7.4+ (compatible PHP 8.x)
+- PHP 8.5+
 - MySQL 5.7+ / MariaDB 10.3+
 - Apache 2.4+ avec mod_rewrite
 - Hébergement cPanel mutualisé compatible
