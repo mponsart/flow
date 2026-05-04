@@ -146,11 +146,12 @@
 
     /* Badges */
     .badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
-    .badge-green { background:#d1fae5; color:#065f46; }
-    .badge-amber { background:#fef3c7; color:#92400e; }
-    .badge-red   { background:#fee2e2; color:#991b1b; }
-    .badge-blue  { background:#dbeafe; color:#1e40af; }
-    .badge-slate { background:#f1f5f9; color:#475569; }
+    .badge-green  { background:#d1fae5; color:#065f46; }
+    .badge-amber  { background:#fef3c7; color:#92400e; }
+    .badge-red    { background:#fee2e2; color:#991b1b; }
+    .badge-blue   { background:#dbeafe; color:#1e40af; }
+    .badge-slate  { background:#f1f5f9; color:#475569; }
+    .badge-violet { background:#ede9fe; color:#5b21b6; }
 
     /* Flash */
     .flash-ok  { display:flex; align-items:center; gap:8px; background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; border-radius:6px; padding:10px 14px; font-size:13px; }

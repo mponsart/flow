@@ -51,7 +51,7 @@ $editExpense = $editExpense ?? null;
       ['Profit (année)',   $profitYear,    $profitYear>=0, 'savings'],
     ];
     ?>
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
       <?php foreach ($kpiRows as [$label,$val,$positive,$icon]):
         $accent = $positive ? 'accent-green' : 'accent-red';
         $color  = $positive ? '#16a34a' : '#dc2626';

@@ -44,7 +44,7 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
         <span class="material-icons-round" style="font-size:16px;color:#2563eb;">add_circle</span>
         Enregistrer un paiement
       </div>
-      <form method="POST" action="<?= APP_URL ?>/payments/store" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;align-items:end;">
+      <form method="POST" action="<?= APP_URL ?>/payments/store" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;align-items:end;">
         <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
         <div class="field">
           <label>Client</label>
@@ -67,14 +67,11 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
             <option value="inconnu">Inconnu</option>
           </select>
         </div>
-        <div class="field">
-          <label>Libellé</label>
-          <div style="display:flex;gap:6px;">
-            <input type="text" name="method_label" placeholder="ex: Virt. SEPA" style="flex:1;">
-            <button type="submit" class="btn btn-primary" style="white-space:nowrap;padding:7px 14px;">
-              <span class="material-icons-round" style="font-size:16px;">save</span>
-            </button>
-          </div>
+        <div class="field" style="grid-column:span 3;"><label>Libellé</label><input type="text" name="method_label" placeholder="ex: Virt. SEPA"></div>
+        <div style="display:flex;align-items:flex-end;">
+          <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+            <span class="material-icons-round" style="font-size:16px;">save</span> Enregistrer
+          </button>
         </div>
       </form>
     </div>

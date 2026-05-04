@@ -61,7 +61,7 @@ $alerts = $annual['alerts'] ?? [];
         $mp >= 20 ? 'accent-green' : ($mp >= 5 ? 'accent-amber' : 'accent-red')],
     ];
     ?>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
       <?php foreach ($primary as [$label, $val, $sub, $accent]): ?>
       <div class="stat-card <?= $accent ?>">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-bottom:8px;"><?= $label ?></div>
