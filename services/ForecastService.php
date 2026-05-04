@@ -372,23 +372,23 @@ class ForecastService
                COALESCE(t.name, "Sans tiers") AS tiers_name,
                i.date_invoice,
                i.total_ht,
-               COALESCE(p.label, "Service non identifié") AS service_label,
-               COALESCE(line_counts.nb_lines, 0) AS nb_lines
+                             COALESCE(p.label, il_meta.line_description, "Service non identifié") AS service_label,
+                             COALESCE(il_meta.nb_lines, 0) AS nb_lines
              FROM invoices i
              LEFT JOIN tiers t ON t.id = i.tiers_id
              LEFT JOIN (
-               SELECT invoice_id, MIN(product_id) AS product_id
-               FROM invoice_lines
-               WHERE product_id IS NOT NULL
-               GROUP BY invoice_id
-             ) il ON il.invoice_id = i.id
-             LEFT JOIN products p ON p.id = il.product_id
-             LEFT JOIN (
-               SELECT invoice_id, COUNT(*) AS nb_lines
+                             SELECT
+                                 invoice_id,
+                                 MIN(product_id) AS product_id,
+                                 MIN(NULLIF(TRIM(description), \'\')) AS line_description,
+                                 COUNT(*) AS nb_lines
                FROM invoice_lines
                GROUP BY invoice_id
-             ) line_counts ON line_counts.invoice_id = i.id
-             WHERE i.status = 2
+                         ) il_meta ON il_meta.invoice_id = i.id
+                         LEFT JOIN products p ON p.id = il_meta.product_id
+                         WHERE (i.status IN (1, 2) OR i.date_paid IS NOT NULL OR EXISTS (
+                                         SELECT 1 FROM payments px WHERE px.invoice_id = i.id
+                                     ))
                AND i.tiers_id IS NOT NULL
                AND i.date_invoice IS NOT NULL
                              AND i.date_invoice >= DATE_SUB(CURDATE(), INTERVAL 36 MONTH)
