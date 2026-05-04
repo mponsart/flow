@@ -138,7 +138,7 @@
               </td>
             </tr>
             <?php else: ?>
-            <?php foreach (array_slice($data['recurring'], 0, 12) as $item): ?>
+            <?php foreach ($data['recurring'] as $item): ?>
             <tr>
               <td><?= htmlspecialchars($item['tiers_name'], ENT_QUOTES, 'UTF-8') ?></td>
               <td><?= htmlspecialchars($item['service_label'], ENT_QUOTES, 'UTF-8') ?></td>

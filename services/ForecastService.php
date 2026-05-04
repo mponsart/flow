@@ -364,36 +364,34 @@ class ForecastService
             return $this->recurringCache;
         }
 
-        // Analyser TOUTES les factures payées — pas de filtre temporel amont
-        // Le filtrage se fait après, sur la date de prochaine occurrence
         $stmt = $this->pdo->query(
             'SELECT
                i.tiers_id,
                COALESCE(t.name, "Sans tiers") AS tiers_name,
                i.date_invoice,
                i.total_ht,
-                             COALESCE(p.label, il_meta.line_description, "Service non identifié") AS service_label,
-                             COALESCE(il_meta.nb_lines, 0) AS nb_lines
+               COALESCE(p.label, il_meta.line_description, i.ref, "Service non identifié") AS service_label,
+               COALESCE(il_meta.nb_lines, 0) AS nb_lines
              FROM invoices i
              LEFT JOIN tiers t ON t.id = i.tiers_id
              LEFT JOIN (
-                             SELECT
-                                 invoice_id,
-                                 MIN(product_id) AS product_id,
-                                 MIN(NULLIF(TRIM(description), \'\')) AS line_description,
-                                 COUNT(*) AS nb_lines
+               SELECT
+                 invoice_id,
+                 MIN(product_id) AS product_id,
+                 MIN(NULLIF(TRIM(description), \'\')) AS line_description,
+                 COUNT(*) AS nb_lines
                FROM invoice_lines
                GROUP BY invoice_id
-                         ) il_meta ON il_meta.invoice_id = i.id
-                         LEFT JOIN products p ON p.id = il_meta.product_id
-                         WHERE (i.status IN (1, 2) OR i.date_paid IS NOT NULL OR EXISTS (
-                                         SELECT 1 FROM payments px WHERE px.invoice_id = i.id
-                                     ))
+             ) il_meta ON il_meta.invoice_id = i.id
+             LEFT JOIN products p ON p.id = il_meta.product_id
+             WHERE (i.status IN (1, 2) OR i.date_paid IS NOT NULL OR EXISTS (
+                     SELECT 1 FROM payments px WHERE px.invoice_id = i.id
+                   ))
                AND i.tiers_id IS NOT NULL
                AND i.date_invoice IS NOT NULL
-                             AND i.date_invoice >= DATE_SUB(CURDATE(), INTERVAL 36 MONTH)
+               AND i.date_invoice >= DATE_SUB(CURDATE(), INTERVAL 36 MONTH)
                AND i.total_ht > 0
-             ORDER BY i.tiers_id, service_label, i.date_invoice'
+             ORDER BY i.tiers_id, i.date_invoice'
         );
 
         if (!$stmt) {
@@ -401,10 +399,31 @@ class ForecastService
             return [];
         }
 
-        $groups = [];
-        foreach ($stmt->fetchAll() as $row) {
-            $key = ($row['tiers_id'] ?? 0) . '|' . $row['service_label'];
-            $groups[$key][] = $row;
+        $rows = $stmt->fetchAll();
+
+        // --- Passe 1 : groupement par (tiers_id + libellé normalisé) ---
+        // Normalise le libellé : supprime les dates, numéros de mois, années
+        // pour que "Maintenance Jan 2026" et "Maintenance Feb 2026" tombent dans le même groupe.
+        $groupsByService = [];
+        foreach ($rows as $row) {
+            $normalized = $this->normalizeServiceLabel($row['service_label']);
+            $key = ($row['tiers_id'] ?? 0) . '|' . $normalized;
+            if (!isset($groupsByService[$key])) {
+                $groupsByService[$key] = [
+                    'label' => $normalized,
+                    'rows'  => [],
+                ];
+            }
+            $groupsByService[$key]['rows'][] = $row;
+        }
+
+        // --- Passe 2 : groupement par tiers_id seul (fallback) ---
+        // Si un tiers a de nombreuses factures avec descriptions trop variées,
+        // on les consolide sous "Services divers".
+        $groupsByTiers = [];
+        foreach ($rows as $row) {
+            $tid = (int)($row['tiers_id'] ?? 0);
+            $groupsByTiers[$tid][] = $row;
         }
 
         $periodLabels = [
@@ -413,45 +432,110 @@ class ForecastService
             'annual'    => 'Annuelle',
         ];
 
-        $recurring = [];
-        foreach ($groups as $rows) {
-            $intervals = [];
-            for ($i = 1; $i < count($rows); $i++) {
-                $intervals[] = (strtotime($rows[$i]['date_invoice']) - strtotime($rows[$i - 1]['date_invoice'])) / 86400;
+        $recurring        = [];
+        $handledTiersIds  = [];   // tiers déjà bien détectés en passe 1 (>1 facture groupées)
+
+        // Traiter passe 1
+        foreach ($groupsByService as $info) {
+            $groupRows = $info['rows'];
+            $label     = $info['label'];
+            $result = $this->buildRecurringEntry($groupRows, $label, $periodLabels);
+            if ($result !== null) {
+                $recurring[] = $result;
+                if ($result['invoice_count'] > 1) {
+                    $handledTiersIds[(int)($groupRows[0]['tiers_id'] ?? 0)] = true;
+                }
             }
-
-            $last    = end($rows);
-            $amounts = array_map(static fn(array $r): float => (float)$r['total_ht'], $rows);
-            $avgAmount  = array_sum($amounts) / count($amounts);
-            $nbLines    = (int)($last['nb_lines'] ?? 0);
-
-            $period  = $this->classifyPeriod($intervals, $last['date_invoice'], $avgAmount, $nbLines);
-            if ($period === null) continue;
-
-            $nextDate = $this->nextOccurrenceDate($last['date_invoice'], $period);
-
-            $recurring[] = [
-                'tiers_name'    => $last['tiers_name'],
-                'service_label' => $last['service_label'],
-                'period'        => $period,
-                'period_label'  => $periodLabels[$period] ?? ucfirst($period),
-                'amount'        => round($avgAmount, 2),
-                'last_date'     => $last['date_invoice'],
-                'next_date'     => $nextDate,
-                'invoice_count' => count($rows),
-            ];
         }
 
-        usort($recurring, static fn(array $a, array $b): int => strcmp($a['next_date'], $b['next_date']));
+        // Traiter passe 2 : tiers non couverts en passe 1 avec plusieurs factures
+        foreach ($groupsByTiers as $tierId => $groupRows) {
+            if (isset($handledTiersIds[$tierId])) {
+                continue; // déjà géré
+            }
+            if (count($groupRows) < 2) {
+                continue; // facture unique → passe 1 suffit
+            }
+            $result = $this->buildRecurringEntry($groupRows, 'Services divers', $periodLabels);
+            if ($result !== null && $result['invoice_count'] > 1) {
+                $recurring[] = $result;
+            }
+        }
 
-        $this->recurringCache = $recurring;
+        // Dédupliquer : si même tiers + même next_date on garde la ligne avec invoice_count le plus élevé
+        $seen = [];
+        $deduped = [];
+        foreach ($recurring as $item) {
+            $dk = $item['tiers_name'] . '|' . $item['next_date'];
+            if (!isset($seen[$dk]) || $item['invoice_count'] > $seen[$dk]['invoice_count']) {
+                $seen[$dk] = $item;
+            }
+        }
+        $deduped = array_values($seen);
+
+        usort($deduped, static fn(array $a, array $b): int => strcmp($a['next_date'], $b['next_date']));
+
+        $this->recurringCache = $deduped;
         return $this->recurringCache;
     }
 
-    private function getRecurringProjection(int $months): array
+    /**
+     * Normalise un libellé de service pour regrouper les variantes liées aux dates.
+     * "Maintenance WordPress Jan 2026" → "Maintenance WordPress"
+     */
+    private function normalizeServiceLabel(string $label): string
     {
-        $values = array_fill(0, $months, 0.0);
-        $recurring = $this->detectRecurringInvoices();
+        // Supprimer années (2020-2029)
+        $label = preg_replace('/\b20\d{2}\b/', '', $label);
+        // Supprimer les mois en toutes lettres (fr + en)
+        $months = 'Janvier|Février|Mars|Avril|Mai|Juin|Juillet|Août|Septembre|Octobre|Novembre|Décembre'
+            . '|January|February|March|April|May|June|July|August|September|October|November|December'
+            . '|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec'
+            . '|janv\.?|févr\.?|avr\.?|juil\.?|août|sept\.?|oct\.?|nov\.?|déc\.?';
+        $label = preg_replace('/\b(?:' . $months . ')\b/iu', '', $label);
+        // Supprimer numéros isolés (numéros de mois, n° facture)
+        $label = preg_replace('/\b\d{1,4}\b/', '', $label);
+        // Nettoyer espaces multiples et ponctuation en fin de chaîne
+        $label = preg_replace('/[\s\-_\/]+/', ' ', $label);
+        $label = trim($label, " \t\n\r\0\x0B-_/");
+        return $label !== '' ? $label : 'Service non identifié';
+    }
+
+    /**
+     * Construit une entrée récurrente depuis un groupe de factures.
+     * Retourne null si le pattern n'est pas classifiable.
+     */
+    private function buildRecurringEntry(array $groupRows, string $label, array $periodLabels): ?array
+    {
+        usort($groupRows, static fn($a, $b) => strcmp($a['date_invoice'], $b['date_invoice']));
+
+        $intervals = [];
+        for ($i = 1; $i < count($groupRows); $i++) {
+            $intervals[] = (strtotime($groupRows[$i]['date_invoice']) - strtotime($groupRows[$i - 1]['date_invoice'])) / 86400;
+        }
+
+        $last      = end($groupRows);
+        $amounts   = array_map(static fn(array $r): float => (float)$r['total_ht'], $groupRows);
+        $avgAmount = array_sum($amounts) / count($amounts);
+        $nbLines   = (int)($last['nb_lines'] ?? 0);
+
+        $period = $this->classifyPeriod($intervals, $last['date_invoice'], $avgAmount, $nbLines);
+        if ($period === null) {
+            return null;
+        }
+
+        $nextDate = $this->nextOccurrenceDate($last['date_invoice'], $period);
+
+        return [
+            'tiers_name'    => $last['tiers_name'],
+            'service_label' => $label,
+            'period'        => $period,
+            'period_label'  => $periodLabels[$period] ?? ucfirst($period),
+            'amount'        => round($avgAmount, 2),
+            'last_date'     => $last['date_invoice'],
+            'next_date'     => $nextDate,
+            'invoice_count' => count($groupRows),
+        ];
 
         foreach ($recurring as $item) {
             $date = $item['next_date'];
