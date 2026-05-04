@@ -364,22 +364,16 @@ class ForecastService
             return $this->recurringCache;
         }
 
-        $activeTiersIds = $this->getActiveTiersWithInvoiceThisMonth();
-        if (empty($activeTiersIds)) {
-            $this->recurringCache = [];
-            return $this->recurringCache;
-        }
-
-        $placeholders = implode(',', array_fill(0, count($activeTiersIds), '?'));
-
-        $stmt = $this->pdo->prepare(
+        // Analyser TOUTES les factures payées — pas de filtre temporel amont
+        // Le filtrage se fait après, sur la date de prochaine occurrence
+        $stmt = $this->pdo->query(
             'SELECT
-               i.id,
                i.tiers_id,
                COALESCE(t.name, "Sans tiers") AS tiers_name,
                i.date_invoice,
                i.total_ht,
-               COALESCE(p.label, "Service non identifié") AS service_label
+               COALESCE(p.label, "Service non identifié") AS service_label,
+               COALESCE(line_counts.nb_lines, 0) AS nb_lines
              FROM invoices i
              LEFT JOIN tiers t ON t.id = i.tiers_id
              LEFT JOIN (
@@ -389,19 +383,34 @@ class ForecastService
                GROUP BY invoice_id
              ) il ON il.invoice_id = i.id
              LEFT JOIN products p ON p.id = il.product_id
+             LEFT JOIN (
+               SELECT invoice_id, COUNT(*) AS nb_lines
+               FROM invoice_lines
+               GROUP BY invoice_id
+             ) line_counts ON line_counts.invoice_id = i.id
              WHERE i.status = 2
-                             AND i.tiers_id IN (' . $placeholders . ')
+               AND i.tiers_id IS NOT NULL
                AND i.date_invoice IS NOT NULL
                AND i.total_ht > 0
              ORDER BY i.tiers_id, service_label, i.date_invoice'
         );
-                $stmt->execute($activeTiersIds);
+
+        if (!$stmt) {
+            $this->recurringCache = [];
+            return [];
+        }
 
         $groups = [];
         foreach ($stmt->fetchAll() as $row) {
             $key = ($row['tiers_id'] ?? 0) . '|' . $row['service_label'];
             $groups[$key][] = $row;
         }
+
+        $periodLabels = [
+            'monthly'   => 'Mensuelle',
+            'quarterly' => 'Trimestrielle',
+            'annual'    => 'Annuelle',
+        ];
 
         $recurring = [];
         foreach ($groups as $rows) {
@@ -410,19 +419,22 @@ class ForecastService
                 $intervals[] = (strtotime($rows[$i]['date_invoice']) - strtotime($rows[$i - 1]['date_invoice'])) / 86400;
             }
 
-            $period = $this->classifyPeriod($intervals);
-            if ($period === null) continue; // intervalle irrégulier, non projeté
+            $last    = end($rows);
+            $amounts = array_map(static fn(array $r): float => (float)$r['total_ht'], $rows);
+            $avgAmount  = array_sum($amounts) / count($amounts);
+            $nbLines    = (int)($last['nb_lines'] ?? 0);
 
-            $amounts = array_map(static fn(array $row): float => (float)$row['total_ht'], $rows);
-            $last = end($rows);
+            $period  = $this->classifyPeriod($intervals, $last['date_invoice'], $avgAmount, $nbLines);
+            if ($period === null) continue;
+
             $recurring[] = [
-                'tiers_name' => $last['tiers_name'],
+                'tiers_name'    => $last['tiers_name'],
                 'service_label' => $last['service_label'],
-                'period' => $period,
-                'period_label' => ['monthly' => 'Mensuelle', 'quarterly' => 'Trimestrielle', 'annual' => 'Annuelle'][$period] ?? ucfirst($period),
-                'amount' => round(array_sum($amounts) / count($amounts), 2),
-                'last_date' => $last['date_invoice'],
-                'next_date' => $this->nextOccurrenceDate($last['date_invoice'], $period),
+                'period'        => $period,
+                'period_label'  => $periodLabels[$period] ?? ucfirst($period),
+                'amount'        => round($avgAmount, 2),
+                'last_date'     => $last['date_invoice'],
+                'next_date'     => $nextDate,
                 'invoice_count' => count($rows),
             ];
         }
@@ -430,25 +442,7 @@ class ForecastService
         usort($recurring, static fn(array $a, array $b): int => strcmp($a['next_date'], $b['next_date']));
 
         $this->recurringCache = $recurring;
-
         return $this->recurringCache;
-    }
-
-    private function getActiveTiersWithInvoiceThisMonth(): array
-    {
-        // Fenêtre de 3 mois pour ne pas rater les clients avec facturation décalée
-        $stmt = $this->pdo->query(
-            'SELECT DISTINCT tiers_id
-             FROM invoices
-             WHERE tiers_id IS NOT NULL
-               AND date_invoice >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 2 MONTH), \'%Y-%m-01\')'
-        );
-
-        if (!$stmt) {
-            return [];
-        }
-
-        return array_map('intval', array_column($stmt->fetchAll(), 'tiers_id'));
     }
 
     private function getRecurringProjection(int $months): array
@@ -473,17 +467,29 @@ class ForecastService
         return ['values' => array_map(static fn(float $value): float => round($value, 2), $values)];
     }
 
-    private function classifyPeriod(array $intervals): ?string
+    private function classifyPeriod(array $intervals, string $lastDate = '', float $avgAmount = 0.0, int $nbLines = 0): ?string
     {
-        if (!$intervals) return 'annual';
+        if (!$intervals) {
+            // Facture unique : pas de pattern prouvé, on essaie de deviner
+            if ($lastDate !== '' && strtotime($lastDate) < strtotime('-14 months')) {
+                // Trop ancienne → client probablement parti
+                return null;
+            }
+            // Petit montant (abonnement / licence) avec 1 article = mensuel probable
+            if ($avgAmount > 0 && $avgAmount < 30 && $nbLines <= 1) {
+                return 'monthly';
+            }
+            // Sinon on considère annuel (one-shot ou renouvellement annuel)
+            return 'annual';
+        }
 
         $avg = array_sum($intervals) / count($intervals);
 
-        // Tolérance large : le décalage d'une facture de quelques semaines
-        // ne doit pas faire basculer une récurrence mensuelle en annuelle.
-        if ($avg >= 20 && $avg <= 50)  return 'monthly';    // ~30 j ±50%
-        if ($avg >= 75 && $avg <= 115) return 'quarterly';  // ~90 j ±25%
-        if ($avg >= 300 && $avg <= 420) return 'annual';    // ~365 j ±15%
+        // Tolérance large : le décalage de quelques semaines ne doit pas
+        // faire basculer une récurrence mensuelle en annuelle.
+        if ($avg >= 20  && $avg <= 50)  return 'monthly';    // ~30 j ±50%
+        if ($avg >= 75  && $avg <= 115) return 'quarterly';  // ~90 j ±25%
+        if ($avg >= 300 && $avg <= 420) return 'annual';     // ~365 j ±15%
 
         // Intervalle ambigu ou irrégulier → on ne projette pas
         return null;
