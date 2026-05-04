@@ -209,9 +209,28 @@ switch (true) {
     case $requestUri === '/forecast' && $method === 'GET':
         require_once __DIR__ . '/models/BaseModel.php';
         require_once __DIR__ . '/models/Invoice.php';
+        require_once __DIR__ . '/models/Tiers.php';
         require_once __DIR__ . '/services/ForecastService.php';
         loadClass('ForecastController');
         (new ForecastController())->index();
+        break;
+
+    case $requestUri === '/forecast/recurrence/store' && $method === 'POST':
+        validateCsrf();
+        require_once __DIR__ . '/models/BaseModel.php';
+        require_once __DIR__ . '/models/Tiers.php';
+        require_once __DIR__ . '/services/ForecastService.php';
+        loadClass('ForecastController');
+        (new ForecastController())->storeRecurring();
+        break;
+
+    case preg_match('#^/forecast/recurrence/delete/(\d+)$#', $requestUri, $m) && $method === 'POST':
+        validateCsrf();
+        require_once __DIR__ . '/models/BaseModel.php';
+        require_once __DIR__ . '/models/Tiers.php';
+        require_once __DIR__ . '/services/ForecastService.php';
+        loadClass('ForecastController');
+        (new ForecastController())->deleteRecurring((int)$m[1]);
         break;
 
     // Expenses

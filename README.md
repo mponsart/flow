@@ -1,12 +1,12 @@
  # Flow – Tableau de bord financier
  
- Application web de gestion financière légère pour TPE/PME.  
+ Application web de gestion financière légère pour TPE/PME.
  PHP 8.4 custom MVC · Tailwind CSS (CDN Play) · Vue.js 3 (CDN) · Chart.js 4 · MySQL.
- 
+
  ---
- 
+
  ## Stack technique
- 
+
  | Couche | Technologie |
  |--------|-------------|
  | Backend | PHP 8.4 (pas de framework) |
@@ -18,206 +18,223 @@
  | Auth | Google OAuth 2.0 (domaine restreint) |
  | Icônes | Material Icons Round CDN |
  | Déploiement | cPanel / o2switch |
- 
+
  ---
- 
+
  ## Architecture
- 
+
  ```
  flow/
- ├── index.php              # Routeur principal (switch sur $path)
-├── .env.example           # Variables d'environnement (template)
-├── .htaccess              # Sécurité Apache + routing
-├── config/                # Configuration (app, database, auth)
-├── controllers/           # Contrôleurs MVC
-├── models/                # Modèles PDO
-├── views/                 # Vues PHP + Chart.js
-├── services/              # Services métier
-├── database/              # Schéma SQL + seeder
-└── cron/                  # Scripts cron
-```
+ ├── index.php                    # Routeur principal (switch sur $path)
+ ├── .env                         # Variables d'environnement (non versionné)
+ ├── .htaccess                    # Sécurité Apache + routing vers index.php
+ ├── config/
+ │   ├── app.php                  # Constantes globales (APP_URL, etc.)
+ │   ├── auth.php                 # Google OAuth
+ │   └── database.php             # Connexion PDO
+ ├── controllers/
+ │   ├── AuthController.php       # Login / callback / logout Google OAuth
+ │   ├── DashboardController.php  # KPIs + graphiques accueil
+ │   ├── TiersController.php      # CRUD clients
+ │   ├── InvoicesController.php   # CRUD factures + mark-paid
+ │   ├── PaymentsController.php   # CRUD paiements
+ │   ├── ExpensesController.php   # CRUD dépenses
+ │   ├── ForecastController.php   # Prévisions
+ │   └── ExportController.php     # Exports CSV
+ ├── models/                      # Modèles PDO
+ ├── views/
+ │   ├── partials/
+ │   │   ├── header.php           # CDN (Tailwind, Vue, Chart.js), ouvre <body>
+ │   │   ├── sidebar.php          # Navigation latérale sombre (slate-900)
+ │   │   └── footer.php           # Sidebar JS, Chart.js defaults, ferme </html>
+ │   ├── login.php
+ │   ├── dashboard.php
+ │   ├── tiers.php / tiers_detail.php
+ │   ├── invoices.php
+ │   ├── payments.php
+ │   ├── expenses.php
+ │   └── forecast.php
+ ├── services/                    # Services métier (KPI, forecast, risk scoring)
+ ├── database/
+ │   ├── schema.sql               # Schéma initial complet
+ │   ├── seed.php                 # Données de démonstration
+ │   └── migrations/
+ │       ├── 001_create_expenses.sql
+ │       └── 002_remove_dolibarr.sql
+ └── cron/
+		 └── kpi_recalc.php           # Recalcul KPI + scores de risque
+ ```
 
-## Installation
+ ---
 
-### 1. Cloner / déposer les fichiers
+ ## Installation
 
-```bash
-# Sur cPanel : déposer dans public_html/flow ou à la racine
-```
+ ### 1. Déposer les fichiers
 
-### 2. Configurer l'environnement
+ Sur cPanel : déposer le contenu dans `public_html/` ou dans un sous-dossier.
 
-```bash
-cp .env.example .env
-# Éditer .env avec vos paramètres
-```
+ ### 2. Créer la base de données
 
-### 3. Créer la base de données
+ ```sql
+ CREATE DATABASE flow_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ ```
 
-Dans phpMyAdmin ou via CLI :
+ Importer le schéma :
 
-```sql
-CREATE DATABASE flow_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+ ```bash
+ mysql -u root -p flow_db < database/schema.sql
+ ```
 
-Puis importer le schéma :
+ Migration si mise à jour depuis une ancienne version :
 
-```bash
-mysql -u root -p flow_db < database/schema.sql
-```
+ ```bash
+ mysql -u root -p flow_db < database/migrations/002_remove_dolibarr.sql
+ ```
 
-### 4. Générer les données de démonstration (optionnel)
+ ### 3. Configurer l'environnement
 
-```bash
-php database/seed.php
-```
+ Créer `.env` à la racine :
 
-### 5. Configuration Apache
+ ```env
+ APP_URL=https://flow.exemple.com
+ APP_ENV=production
 
-Le fichier `.htaccess` est déjà configuré. Assurez-vous que `mod_rewrite` est activé.
+ DB_HOST=localhost
+ DB_NAME=flow_db
+ DB_USER=mon_user
+ DB_PASS=mon_mot_de_passe
 
-## Fichiers locaux non versionnés
+ GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+ GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
+ ALLOWED_DOMAIN=groupe-speed.cloud
+ AUTHORIZED_USERS=user1@groupe-speed.cloud,user2@groupe-speed.cloud
+ ```
 
-Les dossiers et fichiers suivants ne doivent pas être commités :
+ ### 4. Google OAuth 2.0
 
-- `.env` : configuration et secrets propres à chaque environnement
-- `vendor/` : dépendances installées localement si Composer est utilisé
-- `storage/` : logs, cache, sessions et fichiers générés par l'application
+ 1. [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Identifiants**
+ 2. Créer un **ID client OAuth 2.0** → Application web
+ 3. URI de redirection autorisée : `https://votre-domaine.com/auth/google/callback`
+ 4. Copier le Client ID et Client Secret dans `.env`
 
-Ils sont ignorés par `.gitignore`. Sur un serveur, créez ou laissez l'application créer `storage/` avec les permissions d'écriture nécessaires.
+ Seuls les comptes `@groupe-speed.cloud` listés dans `AUTHORIZED_USERS` peuvent se connecter.
 
-## Configuration `.env`
+ ### 5. Données de démonstration (optionnel)
 
-| Variable | Description |
-|---|---|
-| `APP_URL` | URL de base de l'application (sans slash final) |
-| `DB_HOST` | Hôte MySQL |
-| `DB_NAME` | Nom de la base de données |
-| `DB_USER` | Utilisateur MySQL |
-| `DB_PASS` | Mot de passe MySQL |
-| `GOOGLE_CLIENT_ID` | Client ID OAuth Google |
-| `GOOGLE_CLIENT_SECRET` | Client Secret OAuth Google |
-| `ALLOWED_DOMAIN` | Domaine Google Workspace autorisé |
-| `AUTHORIZED_USERS` | Emails autorisés séparés par virgule |
-| `DOLIBARR_URL` | URL de l'instance Dolibarr |
-| `DOLIBARR_API_KEY` | Clé API Dolibarr (REST) |
+ ```bash
+ php database/seed.php
+ ```
 
-## Configuration Google OAuth
+ ---
 
-1. Aller sur [Google Cloud Console](https://console.cloud.google.com/)
-2. Créer un projet ou en sélectionner un existant
-3. Activer l'API **Google+ API** (ou **Google Identity**)
-4. Créer des identifiants → **ID client OAuth 2.0** → Application web
-5. Ajouter l'URI de redirection autorisée : `https://votre-domaine.com/auth/google/callback`
-6. Copier Client ID et Client Secret dans `.env`
+ ## Comment ça fonctionne
 
-**Restriction d'accès :**
-- Seuls les emails `@groupe-speed.cloud` sont acceptés
-- En plus, l'email doit figurer dans `AUTHORIZED_USERS`
+ ### Routing
 
-## Configuration API Dolibarr
+ `index.php` parse `$_SERVER['REQUEST_URI']`, extrait le chemin et route vers le contrôleur/méthode :
 
-1. Dans Dolibarr : **Configuration → API/Services REST**
-2. Activer l'API REST
-3. Générer une clé API pour l'utilisateur administrateur
-4. Renseigner `DOLIBARR_URL` et `DOLIBARR_API_KEY` dans `.env`
+ ```
+ GET  /              → DashboardController::index()
+ GET  /tiers         → TiersController::index()
+ POST /tiers/store   → TiersController::store()
+ POST /tiers/update/5→ TiersController::update(5)
+ POST /tiers/delete/5→ TiersController::destroy(5)
+ GET  /invoices      → InvoicesController::index()
+ POST /invoices/store→ InvoicesController::store()
+ POST /invoices/pay/3→ InvoicesController::markPaid(3)
+ ...
+ ```
 
-`DOLIBARR_URL` peut être l'URL racine de Dolibarr (`https://dolibarr.example.com`) ou l'URL API complète (`https://dolibarr.example.com/api/index.php`). L'application normalise automatiquement le chemin API.
+ Toutes les actions POST valident un token CSRF via `validateCsrf()`.
 
-Les appels API envoient un `User-Agent` explicite (`FlowSync/1.0`) afin d'éviter les blocages cPanel/o2switch de type `Security_Rule = "emptyua"`.
+ ### Frontend
 
-La synchronisation récupère :
-- Tiers (clients/fournisseurs)
-- Services Dolibarr (`/products?type=1`)
-- Factures et leurs lignes
-- Paiements
+ Chaque vue PHP inclut `header.php` (CDN, ouvre `<body>`) et `footer.php` (ferme, JS sidebar, Chart.js defaults).
+ Vue.js 3 gère l'interactivité : boutons toggle, modales de confirmation.
 
-La synchronisation relit toutes les pages disponibles côté Dolibarr et met à jour la base locale par upsert. Les lignes de factures sont remplacées à chaque resynchronisation de la facture afin d'éviter les doublons dans les indicateurs. Les services sont récupérés via l'endpoint Dolibarr `/products` avec `type=1`. Si cet endpoint est refusé par Dolibarr, la synchronisation continue et l'application crée les services nécessaires à partir des lignes de factures lorsque Dolibarr fournit `fk_product`.
+ ```js
+ const { createApp, ref } = Vue;
+ createApp({
+	 setup() {
+		 const showAdd       = ref(false);
+		 const confirmDelete = ref(null);
+		 const csrf          = '<?= $csrf ?>';
+		 return { showAdd, confirmDelete, csrf };
+	 }
+ }).mount('#page-app');
+ ```
 
-## Tâches Cron
+ ### Sécurité
 
-Ajouter dans crontab (`crontab -e`) :
+ - HTTPS imposé par `.htaccess`
+ - Token CSRF sur tous les formulaires POST
+ - Échappement systématique `htmlspecialchars()` / `ENT_QUOTES`
+ - Requêtes préparées PDO (pas d'interpolation SQL)
+ - Auth Google uniquement (pas de mot de passe stocké)
+ - Restriction domaine + whitelist email
 
-```cron
-# Synchronisation Dolibarr toutes les heures
-0 * * * * php /chemin/vers/flow/cron/sync.php >> /var/log/flow_sync.log 2>&1
+ ---
 
-# Recalcul KPI et scores de risque chaque nuit à 2h30
-30 2 * * * php /chemin/vers/flow/cron/kpi_recalc.php >> /var/log/flow_kpi.log 2>&1
-```
+ ## Fonctionnalités
 
-Sur cPanel : **Tâches Cron** dans le panneau de contrôle.
+ ### Tableau de bord
+ KPIs temps réel : CA mensuel/annuel, run-rate, résultat, marge nette, cash, factures en retard.
+ Graphique CA 12 mois, donut dépenses, top clients, top services.
 
-## Fonctionnalités
+ ### Tiers (clients)
+ Liste paginée, recherche, filtre par risque. CRUD complet (ajout, modif, suppression).
+ Fiche détail : historique CA, alertes de risque, factures et paiements liés.
 
-### Tableau de bord
-- KPIs : CA mensuel, annuel, croissance, panier moyen
-- Compteurs factures (payées, impayées, en retard)
-- Graphiques : évolution CA 12 mois, répartition produits, top 10 tiers/produits
+ ### Factures
+ Création manuelle (référence auto `MAN-XXXXXXXX`).
+ Statuts : Brouillon / Validée / Payée / Abandonnée.
+ Marquer payée en un clic (crée automatiquement un paiement).
 
-### Tiers
-- Liste paginée avec recherche et filtre par niveau de risque
-- Fiche détaillée : CA, historique, paiements, alertes, score de risque
+ ### Paiements
+ Enregistrement manuel (tiers, montant, date, mode, libellé).
+ KPIs par mode, graphique mensuel, historique récent (50 lignes).
 
-### Paiements
-- Répartition par mode (CB, virement, chèque, espèces)
-- Distribution de fréquence par client
-- Évolution mensuelle des encaissements
+ ### Dépenses
+ CRUD avec récurrence (mensuelle / annuelle / ponctuelle).
+ Comparatif revenus vs dépenses vs profit mois et année.
 
-### Prévisions
+ ### Prévisions
+ `ForecastService` :
+ - Historique 18 mois + moyennes mobiles MA3/MA6
+ - Régression linéaire (moindres carrés)
+ - Détection récurrences (mensuel / trimestriel / annuel)
+ - Projections 3/6/12 mois (CA brut + net après dépenses)
+ - Score santé financière 0-100
 
-Le moteur de prévision (`ForecastService`) combine deux approches complémentaires.
+ | Intervalle moyen | Périodicité |
+ |---|---|
+ | 20 – 50 j | Mensuelle |
+ | 75 – 115 j | Trimestrielle |
+ | 300 – 420 j | Annuelle |
 
-#### 1. Historique et moyennes mobiles
-Les 18 derniers mois de factures **payées** (statut 2) sont chargés. Deux moyennes mobiles sont calculées sur ces revenus réels :
-- **MA3** : moyenne glissante sur 3 mois (réactivité)
-- **MA6** : moyenne glissante sur 6 mois (lissage du bruit)
+ ### Exports
+ CSV pour factures, paiements, dépenses via `/export/csv?type=xxx`.
 
-#### 2. Régression linéaire
-Une droite de tendance est ajustée sur l'historique (moindres carrés). Elle est extrapolée sur 3, 6 ou 12 mois pour produire une projection *linéaire*. Si les revenus sont tous nuls (base vide), la projection linéaire vaut 0.
+ ---
 
-#### 3. Détection des factures récurrentes
-Les factures payées sont regroupées par couple **(tiers × libellé produit)**. Pour chaque groupe, les intervalles en jours entre factures consécutives sont calculés, puis classifiés :
+ ## Tâche Cron
 
-| Intervalle moyen | Périodicité détectée |
-|---|---|
-| 20 – 50 jours | Mensuelle |
-| 75 – 115 jours | Trimestrielle |
-| 300 – 420 jours | Annuelle |
-| Hors plages | Irrégulière (ignorée) |
+ ```cron
+ 30 2 * * * php /home/user/public_html/flow/cron/kpi_recalc.php >> /var/log/flow_kpi.log 2>&1
+ ```
 
-Pour chaque récurrence détectée, les prochaines occurrences sont projetées sur la fenêtre demandée et leur montant moyen est ajouté mois par mois.
+ Sur cPanel : **Tâches Cron** → ajouter la commande ci-dessus.
 
-> **Tolérance** : un client facturé mensuellement mais avec quelques jours de décalage d'un mois à l'autre reste correctement classifié en « mensuel » — la plage 20-50 jours absorbe les variations normales de durée de mois et les légers retards.
+ ---
 
-#### 4. Projection finale
-La valeur projetée retenue pour chaque mois est le **maximum** entre la projection linéaire et la projection récurrente, afin de ne jamais sous-estimer un revenu contractuel certain.
+ ## Déploiement cPanel (o2switch)
 
-#### 5. Score de santé financière (0-100)
-Calculé à partir de trois indicateurs pondérés :
-
-| Indicateur | Poids | Calcul |
-|---|---|---|
-| Tendance du CA (6 mois) | 40 % | hausse=100, stable=60, baisse=20 |
-| Taux de factures payées | 40 % | `payées / total × 100` |
-| Absence de retards | 20 % | `100 − (nb en retard × 10)` |
-
-#### 6. Indicateur de tendance
-Comparaison du premier et du dernier mois sur les 3 derniers mois réels : +5% → `up`, −5% → `down`, sinon `stable`.
-
-### Synchronisation
-- Statut par entité et date de dernière sync
-- Journal des opérations
-- Synchronisation forcée manuelle
-
-### Exports
-- CSV : factures, tiers, paiements
-- PDF : rapport complet (HTML → impression navigateur)
-
-## Sécurité
-
-- Authentification Google OAuth 2.0 uniquement
-- Validation domaine `@groupe-speed.cloud` + whitelist
+ 1. Déposer les fichiers via FTP ou gestionnaire de fichiers cPanel
+ 2. Créer la base MySQL + l'utilisateur dans **Bases de données MySQL**
+ 3. Importer `database/schema.sql` via phpMyAdmin
+ 4. Créer `.env` avec les bonnes valeurs
+ 5. Vérifier que `.htaccess` est présent à la racine
+ 6. Tester `https://votre-domaine.com/` → redirige vers login Google
 - Protection CSRF sur tous les formulaires POST
 - XSS : `htmlspecialchars()` systématique
 - Sessions sécurisées (httponly, samesite=Strict, régénération)

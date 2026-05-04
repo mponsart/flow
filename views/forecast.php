@@ -28,6 +28,20 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
 
   <main class="flex-1 overflow-y-auto p-6 space-y-5">
 
+    <?php if (!empty($_GET['message'])): ?>
+    <div class="flex items-start gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm">
+      <span class="material-icons-round text-emerald-500 text-lg flex-shrink-0 mt-0.5">check_circle</span>
+      <?= htmlspecialchars($_GET['message'], ENT_QUOTES, 'UTF-8') ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($_GET['error'])): ?>
+    <div class="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+      <span class="material-icons-round text-red-500 text-lg flex-shrink-0 mt-0.5">error</span>
+      <?= htmlspecialchars($_GET['error'], ENT_QUOTES, 'UTF-8') ?>
+    </div>
+    <?php endif; ?>
+
     <!-- Error banner -->
     <?php if (!empty($data['error_message'])): ?>
     <div class="flex items-start gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm">
@@ -85,18 +99,53 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
       </div>
     </div>
 
-    <!-- Recurring services -->
+    <!-- Recurrence setup (client + fréquence uniquement) -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <p class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+        <span class="material-icons-round text-emerald-500 text-base">autorenew</span>
+        Récurrence de paiement (client + fréquence)
+      </p>
+      <form method="POST" action="<?= APP_URL ?>/forecast/recurrence/store" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Client *</label>
+          <select name="tiers_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="">Sélectionner...</option>
+            <?php foreach (($tiersAll ?? []) as $t): ?>
+            <option value="<?= (int)$t['id'] ?>"><?= htmlspecialchars($t['name'], ENT_QUOTES, 'UTF-8') ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Fréquence *</label>
+          <select name="period" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="monthly">Mensuelle</option>
+            <option value="quarterly">Trimestrielle</option>
+            <option value="annual">Annuelle</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+            <span class="material-icons-round text-base">save</span>
+            Enregistrer
+          </button>
+        </div>
+      </form>
+      <p class="text-xs text-slate-500 mt-3">Le montant est calculé automatiquement depuis la moyenne des paiements du client.</p>
+    </div>
+
+    <!-- Recurring payments configured -->
     <?php if (!empty($data['recurring'])): ?>
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
       <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
         <span class="material-icons-round text-emerald-500 text-base">autorenew</span>
-        <p class="text-sm font-semibold text-slate-900">Services récurrents détectés</p>
+        <p class="text-sm font-semibold text-slate-900">Récurrences enregistrées</p>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full">
           <thead class="bg-slate-50">
             <tr>
-              <?php foreach(['Client','Service','Fréquence','Montant','Dernier','Prochain'] as $h): ?>
+              <?php foreach(['Client','Fréquence','Montant moyen','Dernier paiement','Prochaine occurrence',''] as $h): ?>
               <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap"><?= $h ?></th>
               <?php endforeach; ?>
             </tr>
@@ -105,7 +154,6 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
             <?php foreach ($data['recurring'] as $r): ?>
             <tr class="hover:bg-slate-50 transition-colors">
               <td class="px-4 py-3 text-sm text-slate-700 font-medium"><?= htmlspecialchars($r['tiers_name'] ?? '–', ENT_QUOTES, 'UTF-8') ?></td>
-              <td class="px-4 py-3 text-sm text-slate-600"><?= htmlspecialchars($r['service_label'] ?? '–', ENT_QUOTES, 'UTF-8') ?></td>
               <td class="px-4 py-3">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                   <?= htmlspecialchars($r['period_label'] ?? '–', ENT_QUOTES, 'UTF-8') ?>
@@ -114,6 +162,14 @@ $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
               <td class="px-4 py-3 text-sm font-semibold text-slate-900 whitespace-nowrap"><?= number_format((float)$r['amount'], 2, ',', ' ') ?> €</td>
               <td class="px-4 py-3 text-sm text-slate-500 whitespace-nowrap"><?= !empty($r['last_date']) ? date('d/m/Y', strtotime($r['last_date'])) : '–' ?></td>
               <td class="px-4 py-3 text-sm text-blue-600 font-medium whitespace-nowrap"><?= !empty($r['next_date']) ? date('d/m/Y', strtotime($r['next_date'])) : '–' ?></td>
+              <td class="px-4 py-3 text-right">
+                <form method="POST" action="<?= APP_URL ?>/forecast/recurrence/delete/<?= (int)($r['tiers_id'] ?? 0) ?>">
+                  <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                  <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1.5 border border-red-200 text-red-500 text-xs font-medium rounded-lg hover:bg-red-50 transition-colors">
+                    <span class="material-icons-round text-xs">delete</span>
+                  </button>
+                </form>
+              </td>
             </tr>
             <?php endforeach; ?>
           </tbody>

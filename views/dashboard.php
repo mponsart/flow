@@ -25,7 +25,7 @@ $alerts = $annual['alerts'] ?? [];
         <span class="material-icons-round">menu</span>
       </button>
       <span class="material-icons-round text-blue-600 text-2xl">dashboard</span>
-      <h1 class="text-xl font-semibold text-slate-900">Tableau de bord</h1>
+      <h1 class="text-xl font-semibold text-slate-900 font-display">Tableau de bord</h1>
     </div>
     <div class="flex items-center gap-3">
       <?php if (!empty($user['avatar'])): ?>
@@ -38,12 +38,35 @@ $alerts = $annual['alerts'] ?? [];
   <!-- Content -->
   <main class="flex-1 overflow-y-auto p-6 space-y-6">
 
+    <section class="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-blue-50 px-6 py-5 shadow-sm">
+      <div class="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-blue-200/25 blur-2xl"></div>
+      <div class="relative flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[.2em] text-sky-700">Pilotage Financier</p>
+          <h2 class="mt-1 text-2xl font-bold text-slate-900 font-display">Vision instantanée <?= (int)($annual['year'] ?? date('Y')) ?></h2>
+          <p class="text-sm text-slate-600 mt-1">Synthèse en temps réel de la rentabilité, du cash et du risque client.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3 min-w-[260px]">
+          <div class="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500">Résultat mois</p>
+            <p class="text-lg font-bold <?= ((float)($annual['monthly_profit']??0))>=0 ? 'text-emerald-600' : 'text-red-600' ?>">
+              <?= (((float)($annual['monthly_profit']??0))>=0?'+':'').number_format((float)($annual['monthly_profit']??0),0,',',' ') ?> €
+            </p>
+          </div>
+          <div class="rounded-xl border border-blue-200 bg-white/80 px-3 py-2">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500">Run-rate annuel</p>
+            <p class="text-lg font-bold text-blue-700"><?= number_format((float)($annual['run_rate_annual']??0),0,',',' ') ?> €</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Alerts -->
     <?php if (!empty($alerts)): ?>
     <div class="space-y-2">
       <?php foreach ($alerts as $alert): ?>
-      <div class="flex items-start gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm">
-        <span class="material-icons-round text-amber-500 text-lg flex-shrink-0 mt-0.5">warning</span>
+      <div class="flex items-start gap-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 text-sm shadow-sm">
+        <span class="material-icons-round text-amber-500 text-lg flex-shrink-0 mt-0.5">warning_amber</span>
         <?= htmlspecialchars($alert, ENT_QUOTES, 'UTF-8') ?>
       </div>
       <?php endforeach; ?>
@@ -56,13 +79,13 @@ $alerts = $annual['alerts'] ?? [];
         <span class="material-icons-round text-blue-600 text-lg">query_stats</span>
         Vue exécutive <?= (int)($annual['year'] ?? date('Y')) ?>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <?= statusBadge((string)($annual['margin_status'] ?? 'fragile'), $sc) ?> Marge
-        <?= statusBadge((string)($annual['collection_status'] ?? 'fragile'), $sc) ?> Encaissement
-        <?= statusBadge((string)($annual['volatility_status'] ?? 'fragile'), $sc) ?> Volatilité
-        <?= statusBadge((string)($annual['concentration_status'] ?? 'fragile'), $sc) ?> Concentration
-        <?= statusBadge((string)($annual['cash_coverage_status'] ?? 'fragile'), $sc) ?> Couverture
-        <?= statusBadge((string)($annual['delay_risk_status'] ?? 'fragile'), $sc) ?> Retards
+      <div class="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"><?= statusBadge((string)($annual['margin_status'] ?? 'fragile'), $sc) ?> <span>Marge</span></span>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"><?= statusBadge((string)($annual['collection_status'] ?? 'fragile'), $sc) ?> <span>Encaissement</span></span>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"><?= statusBadge((string)($annual['volatility_status'] ?? 'fragile'), $sc) ?> <span>Volatilité</span></span>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"><?= statusBadge((string)($annual['concentration_status'] ?? 'fragile'), $sc) ?> <span>Concentration</span></span>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"><?= statusBadge((string)($annual['cash_coverage_status'] ?? 'fragile'), $sc) ?> <span>Couverture</span></span>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1"><?= statusBadge((string)($annual['delay_risk_status'] ?? 'fragile'), $sc) ?> <span>Retards</span></span>
       </div>
     </div>
 
@@ -91,7 +114,7 @@ $alerts = $annual['alerts'] ?? [];
             ((float)($annual['margin_pct']??0))>=20?'text-emerald-600':(((float)($annual['margin_pct']??0))>=5?'text-amber-600':'text-red-500')],
         ];
         foreach ($finKpis as [$label, $value, $sub, $subColor]): ?>
-        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200">
           <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide truncate"><?= $label ?></p>
           <p class="text-2xl font-bold text-slate-900 mt-1 leading-none"><?= $value ?></p>
           <p class="text-xs mt-1.5 <?= $subColor ?: 'text-slate-500' ?>"><?= $sub ?></p>
@@ -117,7 +140,7 @@ $alerts = $annual['alerts'] ?? [];
             ((float)($annual['avg_overdue_days']??0))<=10?'text-emerald-600':(((float)($annual['avg_overdue_days']??0))<=30?'text-amber-600':'text-red-500')],
         ];
         foreach ($cashKpis as [$label, $value, $sub, $subColor]): ?>
-        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200">
           <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide truncate"><?= $label ?></p>
           <p class="text-2xl font-bold text-slate-900 mt-1 leading-none"><?= $value ?></p>
           <p class="text-xs mt-1.5 <?= $subColor ?: 'text-slate-500' ?>"><?= $sub ?></p>

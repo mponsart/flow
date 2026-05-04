@@ -15,21 +15,21 @@
 
 // Chart.js global defaults
 if (typeof Chart !== 'undefined') {
-  Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+  Chart.defaults.font.family = "'Manrope', system-ui, sans-serif";
   Chart.defaults.font.size   = 12;
-  Chart.defaults.color       = '#64748b';
-  Chart.defaults.borderColor = '#e2e8f0';
+  Chart.defaults.color       = '#42566f';
+  Chart.defaults.borderColor = '#dbe5f2';
   Chart.defaults.plugins.legend.labels.boxWidth  = 10;
   Chart.defaults.plugins.legend.labels.padding   = 14;
-  Chart.defaults.plugins.tooltip.backgroundColor = '#1e293b';
-  Chart.defaults.plugins.tooltip.titleColor      = '#f1f5f9';
-  Chart.defaults.plugins.tooltip.bodyColor       = '#cbd5e1';
+  Chart.defaults.plugins.tooltip.backgroundColor = '#111827';
+  Chart.defaults.plugins.tooltip.titleColor      = '#f8fafc';
+  Chart.defaults.plugins.tooltip.bodyColor       = '#dbe7f5';
   Chart.defaults.plugins.tooltip.cornerRadius    = 8;
   Chart.defaults.plugins.tooltip.padding         = 10;
   Chart.defaults.plugins.tooltip.callbacks = Chart.defaults.plugins.tooltip.callbacks || {};
 }
 
-const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+const CHART_COLORS = ['#2563eb','#0ea5e9','#10b981','#f59e0b','#ef4444','#e11d48','#14b8a6','#84cc16'];
 </script>
 </body>
 </html>
