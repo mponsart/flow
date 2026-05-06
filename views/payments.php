@@ -6,7 +6,7 @@ $methodCss = ['CB'=>'badge-blue','virement'=>'badge-green','chèque'=>'badge-amb
 $csrf = htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8');
 ?>
 
-<div id="main-wrap" class="flex-1 flex flex-col overflow-hidden ml-56">
+<div id="main-wrap" class="flex-1 flex flex-col overflow-hidden">
 
   <div class="topbar flex items-center justify-between px-6 h-14 flex-shrink-0 sticky top-0 z-20">
     <div style="display:flex;align-items:center;gap:10px;">

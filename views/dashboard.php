@@ -7,7 +7,7 @@ $year   = (int)($annual['year'] ?? date('Y'));
 $alerts = $annual['alerts'] ?? [];
 ?>
 
-<div id="main-wrap" class="flex-1 flex flex-col overflow-hidden ml-56">
+<div id="main-wrap" class="flex-1 flex flex-col overflow-hidden">
 
   <!-- Topbar -->
   <div class="topbar flex items-center justify-between px-6 h-14 flex-shrink-0 sticky top-0 z-20">

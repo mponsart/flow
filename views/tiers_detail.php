@@ -8,7 +8,7 @@ $riskBadge = ['low'=>'bg-emerald-100 text-emerald-700','medium'=>'bg-amber-100 t
 $riskLabel = ['low'=>'Faible','medium'=>'Modéré','high'=>'Élevé'];
 ?>
 
-<div id="main-wrap" class="flex-1 flex flex-col overflow-hidden ml-56">
+<div id="main-wrap" class="flex-1 flex flex-col overflow-hidden">
   <header class="bg-white border-b border-slate-200 px-6 h-16 flex items-center justify-between flex-shrink-0 sticky top-0 z-20">
     <div class="flex items-center gap-3">
       <button id="menu-toggle" class="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100">

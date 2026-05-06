@@ -8,7 +8,7 @@ $recLabels = ['monthly'=>'Mensuel','quarterly'=>'Trimestriel','annual'=>'Annuel'
 $recBadge  = ['monthly'=>'badge-blue','quarterly'=>'badge-violet','annual'=>'badge-slate','one_time'=>'badge-amber'];
 ?>
 
-<div id="main-wrap" class="flex-1 flex flex-col overflow-hidden ml-56">
+<div id="main-wrap" class="flex-1 flex flex-col overflow-hidden">
 
   <div class="topbar flex items-center justify-between px-6 h-14 flex-shrink-0 sticky top-0 z-20">
     <div style="display:flex;align-items:center;gap:10px;">
