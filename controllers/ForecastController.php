@@ -10,19 +10,20 @@ class ForecastController
     {
         $data = [
             'historical' => [],
-            'historical_expenses' => [],
             'ma3' => [],
             'ma6' => [],
-            'proj3' => ['values' => [], 'labels' => [], 'expense_values' => [], 'net_values' => []],
-            'proj6' => ['values' => [], 'labels' => [], 'expense_values' => [], 'net_values' => []],
-            'proj12' => ['values' => [], 'labels' => [], 'expense_values' => [], 'net_values' => []],
-            'expenses_available' => false,
+            'proj3'  => ['values' => [], 'labels' => [], 'expense_values' => [], 'net_values' => [], 'total' => 0.0, 'total_net' => 0.0, 'total_expenses' => 0.0],
+            'proj6'  => ['values' => [], 'labels' => [], 'expense_values' => [], 'net_values' => [], 'total' => 0.0, 'total_net' => 0.0, 'total_expenses' => 0.0],
+            'proj12' => ['values' => [], 'labels' => [], 'expense_values' => [], 'net_values' => [], 'total' => 0.0, 'total_net' => 0.0, 'total_expenses' => 0.0],
+            'expenses_available'    => false,
             'expenses_monthly_base' => 0.0,
-            'expenses_annual_equivalent' => 0.0,
-            'recurring' => [],
-            'trend' => 'stable',
-            'health' => 0.0,
-            'error_message' => null,
+            'mrr'                   => 0.0,
+            'arr'                   => 0.0,
+            'subscriptions'         => [],
+            'recurring'             => [],
+            'trend'                 => 'stable',
+            'health'                => 0.0,
+            'error_message'         => null,
         ];
 
         $tiersAll = [];

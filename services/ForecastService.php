@@ -76,56 +76,96 @@ class ForecastService
 
     public function getProjections(array $revenues, int $months = 12): array
     {
-        $values = array_map(static fn($v): float => (float)$v, array_column($revenues, 'revenue'));
         $labels = [];
         for ($i = 1; $i <= $months; $i++) {
             $labels[] = date('M Y', strtotime("+$i months"));
         }
 
-        if (empty($values) || max($values) <= 0) {
-            $recurringProjection = $this->getRecurringProjection($months);
-            return [
-                'values' => $recurringProjection['values'],
-                'labels' => $labels,
-                'linear_values' => array_fill(0, $months, 0.0),
-                'recurring_values' => $recurringProjection['values'],
-            ];
-        }
+        // Subscription-based projection (primary source of truth).
+        // Historical payments already include subscription payments — adding linear
+        // regression on top would double-count them.
+        $subValues = $this->getSubscriptionProjection($months);
+        $hasSubs   = array_sum($subValues) > 0;
 
-        $n = count($values);
-        $ys = array_values($values);
-        $xs = range(0, $n - 1);
+        if ($hasSubs) {
+            $projValues = $subValues;
+        } else {
+            // Fallback: linear regression on historical payments when no subscriptions.
+            $ys = array_map(static fn($v): float => (float)$v, array_column($revenues, 'revenue'));
+            $n  = count($ys);
+            $projValues = array_fill(0, $months, 0.0);
 
-        $sumX = array_sum($xs);
-        $sumY = array_sum($ys);
-        $sumXY = 0;
-        $sumX2 = 0;
-        foreach ($xs as $i => $x) {
-            $sumXY += $x * $ys[$i];
-            $sumX2 += $x * $x;
-        }
+            if ($n > 0 && max($ys) > 0) {
+                $xs    = range(0, $n - 1);
+                $sumX  = array_sum($xs);
+                $sumY  = array_sum($ys);
+                $sumXY = 0;
+                $sumX2 = 0;
+                foreach ($xs as $i => $x) {
+                    $sumXY += $x * $ys[$i];
+                    $sumX2 += $x * $x;
+                }
+                $slope     = ($n * $sumXY - $sumX * $sumY) / max(1, ($n * $sumX2 - $sumX * $sumX));
+                $intercept = ($sumY - $slope * $sumX) / max(1, $n);
 
-        $slope = ($n * $sumXY - $sumX * $sumY) / max(1, ($n * $sumX2 - $sumX * $sumX));
-        $intercept = ($sumY - $slope * $sumX) / max(1, $n);
-
-        $linear = [];
-        for ($i = 1; $i <= $months; $i++) {
-            $linear[] = max(0, round($intercept + $slope * ($n + $i - 1), 2));
-        }
-
-        $recurringProjection = $this->getRecurringProjection($months);
-        $projections = [];
-        foreach ($linear as $i => $value) {
-            // Combine la tendance historique avec le socle récurrent (abonnements + legacy).
-            $projections[] = round(max(0.0, (float)$value) + (float)($recurringProjection['values'][$i] ?? 0), 2);
+                for ($i = 1; $i <= $months; $i++) {
+                    $projValues[$i - 1] = max(0.0, round($intercept + $slope * ($n + $i - 1), 2));
+                }
+            }
         }
 
         return [
-            'values' => $projections,
+            'values' => $projValues,
             'labels' => $labels,
-            'linear_values' => $linear,
-            'recurring_values' => $recurringProjection['values'],
+            'total'  => round(array_sum($projValues), 2),
         ];
+    }
+
+    private function getSubscriptionProjection(int $months): array
+    {
+        $values = array_fill(0, $months, 0.0);
+
+        foreach ($this->getActiveSubscriptions() as $sub) {
+            $amount = (float)($sub['amount'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $period    = (string)($sub['recurrence'] ?? 'monthly');
+            $startDate = !empty($sub['start_date']) ? (string)$sub['start_date'] : date('Y-m-d');
+            $endDate   = !empty($sub['end_date'])   ? (string)$sub['end_date']   : null;
+
+            for ($i = 0; $i < $months; $i++) {
+                $tTs = strtotime('+' . ($i + 1) . ' months');
+                $tY  = (int)date('Y', $tTs);
+                $tM  = (int)date('m', $tTs);
+
+                if ($endDate !== null && $tTs > strtotime($endDate)) {
+                    continue;
+                }
+
+                $sTs  = strtotime($startDate);
+                $diff = ($tY - (int)date('Y', $sTs)) * 12 + ($tM - (int)date('m', $sTs));
+
+                if ($diff < 0) {
+                    continue;
+                }
+
+                $applies = match ($period) {
+                    'monthly'   => true,
+                    'quarterly' => $diff % 3 === 0,
+                    'annual'    => $diff % 12 === 0,
+                    'one_time'  => $diff === 0,
+                    default     => false,
+                };
+
+                if ($applies) {
+                    $values[$i] += $amount;
+                }
+            }
+        }
+
+        return array_map(static fn(float $v): float => round($v, 2), $values);
     }
 
     public function getTrendIndicator(array $revenues): string
@@ -151,58 +191,80 @@ class ForecastService
     public function getFinancialHealthScore(): float
     {
         $revenues = $this->getMonthlyRevenues(6);
-        $trend = $this->getTrendIndicator($revenues);
+        $trend    = $this->getTrendIndicator($revenues);
         $trendScore = match ($trend) {
-            'up' => 100,
+            'up'     => 100,
             'stable' => 60,
-            'down' => 20,
+            'down'   => 20,
         };
 
-        $stmt = $this->pdo->query(
-            'SELECT
-               COUNT(*) AS total,
-               SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) AS paid
-             FROM invoices'
-        );
-        $counts = $stmt->fetch();
-        $paidRatio = $counts['total'] > 0 ? $counts['paid'] / $counts['total'] : 1;
-        $paidScore = $paidRatio * 100;
+        // Coverage: monthly revenue (or MRR) vs monthly expenses
+        $inputs = $this->loadExpenseInputs();
+        $monthlyExpenses = $inputs['available'] ? (float)$inputs['monthly_base'] : 0.0;
 
-        $stmt = $this->pdo->query('SELECT COUNT(*) FROM invoices WHERE is_overdue = 1');
-        $overdueCount = (int)$stmt->fetchColumn();
-        $overdueScore = max(0, 100 - $overdueCount * 10);
+        $mrr = 0.0;
+        foreach ($this->getActiveSubscriptions() as $sub) {
+            $amount = (float)($sub['amount'] ?? 0);
+            $mrr += match ((string)($sub['recurrence'] ?? 'monthly')) {
+                'monthly'   => $amount,
+                'quarterly' => $amount / 3,
+                'annual'    => $amount / 12,
+                default     => 0.0,
+            };
+        }
 
-        return round(($trendScore * 0.4 + $paidScore * 0.4 + $overdueScore * 0.2), 1);
+        $recentRevs = array_column(array_slice($revenues, -3), 'revenue');
+        $avgRevenue = count($recentRevs) > 0 ? (float)(array_sum($recentRevs) / count($recentRevs)) : 0.0;
+        $effectiveRevenue = max($avgRevenue, $mrr);
+
+        $coverageScore = 100;
+        if ($monthlyExpenses > 0) {
+            $ratio = $effectiveRevenue / $monthlyExpenses;
+            $coverageScore = (int)min(100, max(0, $ratio * 80));
+        }
+
+        return round($trendScore * 0.5 + $coverageScore * 0.5, 1);
     }
 
     public function getAllProjections(): array
     {
         $revenues = $this->getMonthlyRevenues(18);
-        $proj3 = $this->getProjections($revenues, 3);
-        $proj6 = $this->getProjections($revenues, 6);
-        $proj12 = $this->getProjections($revenues, 12);
+        $proj3    = $this->getProjections($revenues, 3);
+        $proj6    = $this->getProjections($revenues, 6);
+        $proj12   = $this->getProjections($revenues, 12);
 
         $expenseProjection12 = $this->getExpenseProjection(12);
-        $historicalExpenses = $this->getHistoricalExpenseSeries($revenues);
 
-        $proj3 = $this->mergeRevenueAndExpenses($proj3, $expenseProjection12['values']);
-        $proj6 = $this->mergeRevenueAndExpenses($proj6, $expenseProjection12['values']);
+        $proj3  = $this->mergeRevenueAndExpenses($proj3,  $expenseProjection12['values']);
+        $proj6  = $this->mergeRevenueAndExpenses($proj6,  $expenseProjection12['values']);
         $proj12 = $this->mergeRevenueAndExpenses($proj12, $expenseProjection12['values']);
 
+        $mrr = 0.0;
+        foreach ($this->getActiveSubscriptions() as $sub) {
+            $amount = (float)($sub['amount'] ?? 0);
+            $mrr += match ((string)($sub['recurrence'] ?? 'monthly')) {
+                'monthly'   => $amount,
+                'quarterly' => $amount / 3,
+                'annual'    => $amount / 12,
+                default     => 0.0,
+            };
+        }
+
         return [
-            'historical' => $revenues,
-            'historical_expenses' => $historicalExpenses,
-            'ma3' => $this->getMovingAverage($revenues, 3),
-            'ma6' => $this->getMovingAverage($revenues, 6),
-            'proj3' => $proj3,
-            'proj6' => $proj6,
-            'proj12' => $proj12,
-            'expenses_available' => $expenseProjection12['available'],
+            'historical'            => $revenues,
+            'ma3'                   => $this->getMovingAverage($revenues, 3),
+            'ma6'                   => $this->getMovingAverage($revenues, 6),
+            'proj3'                 => $proj3,
+            'proj6'                 => $proj6,
+            'proj12'                => $proj12,
+            'expenses_available'    => $expenseProjection12['available'],
             'expenses_monthly_base' => $expenseProjection12['monthly_base'],
-            'expenses_annual_equivalent' => $expenseProjection12['annual_equivalent'],
-            'recurring' => $this->detectRecurringInvoices(),
-            'trend' => $this->getTrendIndicator($revenues),
-            'health' => $this->getFinancialHealthScore(),
+            'mrr'                   => round($mrr, 2),
+            'arr'                   => round($mrr * 12, 2),
+            'subscriptions'         => $this->getActiveSubscriptions(),
+            'recurring'             => $this->detectRecurringInvoices(),
+            'trend'                 => $this->getTrendIndicator($revenues),
+            'health'                => $this->getFinancialHealthScore(),
         ];
     }
 
@@ -220,7 +282,10 @@ class ForecastService
         }
 
         $projection['expense_values'] = array_map(static fn($v): float => round((float)$v, 2), $expenseValues);
-        $projection['net_values'] = $netValues;
+        $projection['net_values']     = $netValues;
+        $projection['total']          = round(array_sum($projection['values']), 2);
+        $projection['total_net']      = round(array_sum($netValues), 2);
+        $projection['total_expenses'] = round(array_sum($expenseValues), 2);
         return $projection;
     }
 
