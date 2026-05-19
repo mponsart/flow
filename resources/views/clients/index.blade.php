@@ -4,7 +4,7 @@
 <div class="max-w-4xl mx-auto py-8">
     <h1 class="text-2xl font-bold mb-6">Clients</h1>
     <div class="mb-4 flex justify-end">
-        <a href="#" class="bg-primary hover:bg-accent text-white px-4 py-2 rounded">Ajouter un client</a>
+        <a href="{{ route('clients.create') }}" class="bg-primary hover:bg-accent text-white px-4 py-2 rounded">Ajouter un client</a>
     </div>
     <div class="bg-card rounded shadow p-4">
         <table class="min-w-full text-sm">
@@ -28,8 +28,13 @@
                             {{ ucfirst($client->status) }}
                         </span>
                     </td>
-                    <td class="py-2 px-3">
-                        <a href="#" class="text-primary hover:underline">Voir</a>
+                    <td class="py-2 px-3 flex gap-2">
+                        <a href="{{ route('clients.edit', $client) }}" class="text-primary hover:underline">Éditer</a>
+                        <form action="{{ route('clients.destroy', $client) }}" method="POST" onsubmit="return confirm('Supprimer ce client ?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-red-500 hover:underline">Supprimer</button>
+                        </form>
                     </td>
                 </tr>
                 @empty
