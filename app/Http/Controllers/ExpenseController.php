@@ -13,7 +13,8 @@ class ExpenseController extends Controller
      */
     public function index()
     {
-        return view('expenses.index');
+        $expenses = Expense::with('service')->orderByDesc('date')->paginate(15);
+        return view('expenses.index', compact('expenses'));
     }
 
     /**
@@ -48,6 +49,15 @@ class ExpenseController extends Controller
     {
         $expense = Expense::findOrFail($id);
         return view('expenses.show', compact('expense'));
+    }
+
+    /**
+     * Show the form for editing the specified expense.
+     */
+    public function edit(string $id)
+    {
+        $expense = Expense::findOrFail($id);
+        return view('expenses.edit', compact('expense'));
     }
 
     /**

@@ -40,6 +40,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/ai/summary', [AiController::class, 'summary'])->name('ai.summary');
     Route::post('/ai/analyze', [AiController::class, 'analyze'])->name('ai.analyze');
     Route::post('/ai/anomalies', [AiController::class, 'anomalies'])->name('ai.anomalies');
+    // Dépenses CRUD
+    Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index');
     Route::get('/expenses/create', [ExpenseController::class, 'create'])->name('expenses.create');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+    Route::get('/expenses/{expense}', [ExpenseController::class, 'show'])->name('expenses.show');
+    Route::get('/expenses/{expense}/edit', [ExpenseController::class, 'edit'])->name('expenses.edit');
+    Route::put('/expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update');
+    Route::delete('/expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
 });

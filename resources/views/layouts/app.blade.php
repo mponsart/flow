@@ -35,6 +35,7 @@
                 <a href="/dashboard" class="block py-2 px-3 rounded hover:bg-zinc-700 transition">Dashboard</a>
                 <a href="/clients" class="block py-2 px-3 rounded hover:bg-zinc-700 transition">Clients</a>
                 <a href="/services" class="block py-2 px-3 rounded hover:bg-zinc-700 transition">Services</a>
+                <a href="/expenses" class="block py-2 px-3 rounded hover:bg-zinc-700 transition">Dépenses</a>
                 <a href="/ai" class="block py-2 px-3 rounded hover:bg-zinc-700 transition">IA</a>
             </nav>
             <form method="POST" action="/logout" class="mt-8">
