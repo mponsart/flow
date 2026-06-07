@@ -6,20 +6,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('forecasts', function (Blueprint $table) {
             $table->id();
+            $table->date('month'); // Premier jour du mois
+            $table->decimal('projected_revenue', 10, 2)->default(0);
+            $table->decimal('projected_expenses', 10, 2)->default(0);
+            $table->decimal('projected_profit', 10, 2)->default(0);
+            $table->decimal('actual_revenue', 10, 2)->nullable();
+            $table->decimal('actual_expenses', 10, 2)->nullable();
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('forecasts');

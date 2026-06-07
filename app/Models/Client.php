@@ -24,4 +24,24 @@ class Client extends Model
     {
         return $this->hasMany(Expense::class);
     }
+
+    public function activeSubscriptions()
+    {
+        return $this->hasMany(Subscription::class)->where('status', 'actif');
+    }
+
+    public function getTotalRevenueAttribute(): float
+    {
+        return (float) $this->revenues()->sum('amount');
+    }
+
+    public function getTotalExpensesAttribute(): float
+    {
+        return (float) $this->expenses()->sum('amount');
+    }
+
+    public function getNetProfitAttribute(): float
+    {
+        return $this->total_revenue - $this->total_expenses;
+    }
 }

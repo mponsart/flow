@@ -6,29 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('revenues', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('client_id');
-            $table->unsignedBigInteger('subscription_id');
+            $table->foreignId('client_id')->constrained()->onDelete('cascade');
+            $table->foreignId('subscription_id')->nullable()->constrained()->onDelete('set null');
             $table->decimal('amount', 10, 2);
-            $table->dateTime('date');
-            $table->string('type'); // mensuel ou annuel
-            $table->text('note')->nullable();
+            $table->date('date');
+            $table->string('description')->nullable();
+            $table->string('status')->default('paid'); // paid, pending
             $table->timestamps();
-
-            $table->foreign('client_id')->references('id')->on('clients')->onDelete('cascade');
-            $table->foreign('subscription_id')->references('id')->on('subscriptions')->onDelete('cascade');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('revenues');
