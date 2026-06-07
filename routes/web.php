@@ -20,6 +20,7 @@ Route::get('/', function () {
 Route::get('/login', [AuthController::class, 'redirectToGoogle'])->name('login');
 Route::get('/auth/callback', [AuthController::class, 'handleGoogleCallback']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/forbidden', fn() => view('auth.forbidden'))->name('forbidden');
 
 Route::middleware(['auth', 'restrict.domain'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');

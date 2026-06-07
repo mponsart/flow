@@ -9,16 +9,25 @@ use Illuminate\Support\Facades\Auth;
 
 class RestrictGoogleDomain
 {
-    /**
-     * Handle an incoming request.
-     */
     public function handle(Request $request, Closure $next)
     {
         $user = Auth::user();
-        if ($user && !Str::endsWith($user->email, '@groupe-speed.cloud')) {
-            Auth::logout();
-            return redirect('/login')->withErrors(['email' => 'Seuls les comptes @groupe-speed.cloud sont autorisés.']);
+        if (!$user) {
+            return $next($request);
         }
+
+        if (!Str::endsWith($user->email, '@groupe-speed.cloud')) {
+            Auth::logout();
+            return redirect('/login')->with('auth_error', 'Seuls les comptes @groupe-speed.cloud sont autorisés.');
+        }
+
+        $blacklist = array_filter(array_map('trim', explode(',', env('AUTH_BLACKLIST', ''))));
+        if (in_array(strtolower($user->email), array_map('strtolower', $blacklist))) {
+            $email = $user->email;
+            Auth::logout();
+            return redirect()->route('forbidden')->with('blocked_email', $email);
+        }
+
         return $next($request);
     }
 }
