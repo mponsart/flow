@@ -16,14 +16,16 @@ class RestrictGoogleDomain
             return $next($request);
         }
 
+        // Vérification du domaine
         $domain = config('services.auth.domain', '@groupe-speed.cloud');
         if (!Str::endsWith($user->email, $domain)) {
             Auth::logout();
-            return redirect('/login')->with('auth_error', 'Seuls les comptes ' . $domain . ' sont autorisés.');
+            return redirect()->route('forbidden')->with('blocked_email', $user->email);
         }
 
-        $blacklist = config('services.auth.blacklist', []);
-        if (in_array(strtolower($user->email), array_map('strtolower', $blacklist))) {
+        // Whitelist : si définie, seuls les comptes listés ont accès
+        $whitelist = config('services.auth.whitelist', []);
+        if (!empty($whitelist) && !in_array(strtolower($user->email), array_map('strtolower', $whitelist))) {
             $email = $user->email;
             Auth::logout();
             return redirect()->route('forbidden')->with('blocked_email', $email);

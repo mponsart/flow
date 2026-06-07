@@ -43,7 +43,7 @@ return [
 
     'auth' => [
         'domain' => env('AUTH_DOMAIN', '@groupe-speed.cloud'),
-        'blacklist' => array_filter(array_map('trim', explode(',', env('AUTH_BLACKLIST', '')))),
+        'whitelist' => array_filter(array_map('trim', explode(',', env('AUTH_WHITELIST', '')))),
     ],
 
 ];

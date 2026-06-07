@@ -35,8 +35,9 @@ class AuthController extends Controller
             return redirect('/login')->with('auth_error', 'Seuls les comptes ' . $domain . ' sont autorisés.');
         }
 
-        $blacklist = config('services.auth.blacklist', []);
-        if (in_array(strtolower($email), array_map('strtolower', $blacklist))) {
+        // Whitelist : si définie, seuls les comptes listés ont accès
+        $whitelist = config('services.auth.whitelist', []);
+        if (!empty($whitelist) && !in_array(strtolower($email), array_map('strtolower', $whitelist))) {
             return redirect()->route('forbidden')->with('blocked_email', $email);
         }
         $user = User::firstOrCreate([
