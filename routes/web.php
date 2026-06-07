@@ -8,6 +8,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RevenueController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ForecastController;
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -35,4 +36,6 @@ Route::middleware(['auth', 'restrict.domain'])->group(function () {
     Route::post('expenses/{year}/{month}/override', [ExpenseController::class, 'storeOverride'])->name('expenses.storeOverride');
 
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+
+    Route::get('forecasts', [ForecastController::class, 'index'])->name('forecasts.index');
 });
