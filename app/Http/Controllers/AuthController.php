@@ -30,11 +30,12 @@ class AuthController extends Controller
         $googleUser = Socialite::driver('google')->stateless()->user();
         $email = $googleUser->getEmail();
 
-        if (!Str::endsWith($email, '@groupe-speed.cloud')) {
-            return redirect('/login')->with('auth_error', 'Seuls les comptes @groupe-speed.cloud sont autorisés.');
+        $domain = config('services.auth.domain', '@groupe-speed.cloud');
+        if (!Str::endsWith($email, $domain)) {
+            return redirect('/login')->with('auth_error', 'Seuls les comptes ' . $domain . ' sont autorisés.');
         }
 
-        $blacklist = array_filter(array_map('trim', explode(',', env('AUTH_BLACKLIST', ''))));
+        $blacklist = config('services.auth.blacklist', []);
         if (in_array(strtolower($email), array_map('strtolower', $blacklist))) {
             return redirect()->route('forbidden')->with('blocked_email', $email);
         }

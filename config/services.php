@@ -41,4 +41,9 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'auth' => [
+        'domain' => env('AUTH_DOMAIN', '@groupe-speed.cloud'),
+        'blacklist' => array_filter(array_map('trim', explode(',', env('AUTH_BLACKLIST', '')))),
+    ],
+
 ];
