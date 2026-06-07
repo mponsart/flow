@@ -44,7 +44,6 @@ return [
     'auth' => [
         'domain' => env('AUTH_DOMAIN', '@groupe-speed.cloud'),
         'blacklist' => array_filter(array_map('trim', explode(',', env('AUTH_BLACKLIST', '')))),
-        'superadmin' => env('AUTH_SUPERADMIN', 'maxime.ponsart@groupe-speed.cloud'),
     ],
 
 ];

@@ -22,11 +22,6 @@ class RestrictGoogleDomain
             return redirect('/login')->with('auth_error', 'Seuls les comptes ' . $domain . ' sont autorisés.');
         }
 
-        $superadmin = config('services.auth.superadmin', 'maxime.ponsart@groupe-speed.cloud');
-        if (strtolower($user->email) === strtolower($superadmin)) {
-            return $next($request);
-        }
-
         $blacklist = config('services.auth.blacklist', []);
         if (in_array(strtolower($user->email), array_map('strtolower', $blacklist))) {
             $email = $user->email;

@@ -35,9 +35,8 @@ class AuthController extends Controller
             return redirect('/login')->with('auth_error', 'Seuls les comptes ' . $domain . ' sont autorisés.');
         }
 
-        $superadmin = config('services.auth.superadmin', 'maxime.ponsart@groupe-speed.cloud');
         $blacklist = config('services.auth.blacklist', []);
-        if (strtolower($email) !== strtolower($superadmin) && in_array(strtolower($email), array_map('strtolower', $blacklist))) {
+        if (in_array(strtolower($email), array_map('strtolower', $blacklist))) {
             return redirect()->route('forbidden')->with('blocked_email', $email);
         }
         $user = User::firstOrCreate([
