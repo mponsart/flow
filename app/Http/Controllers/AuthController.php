@@ -36,7 +36,7 @@ class AuthController extends Controller
 
         $blacklist = array_filter(array_map('trim', explode(',', env('AUTH_BLACKLIST', ''))));
         if (in_array(strtolower($email), array_map('strtolower', $blacklist))) {
-            return redirect('/login')->with('auth_error', 'Votre compte n\'est pas autorisé à accéder à cette application.');
+            return redirect()->route('forbidden')->with('blocked_email', $email);
         }
         $user = User::firstOrCreate([
             'email' => $email

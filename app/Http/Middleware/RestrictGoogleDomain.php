@@ -23,8 +23,9 @@ class RestrictGoogleDomain
 
         $blacklist = array_filter(array_map('trim', explode(',', env('AUTH_BLACKLIST', ''))));
         if (in_array(strtolower($user->email), array_map('strtolower', $blacklist))) {
+            $email = $user->email;
             Auth::logout();
-            return redirect('/login')->with('auth_error', 'Votre compte n\'est pas autorisé à accéder à cette application.');
+            return redirect()->route('forbidden')->with('blocked_email', $email);
         }
 
         return $next($request);
