@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiReport;
+use App\Services\FinanceService;
 use App\Services\OllamaCloudService;
 use Illuminate\Http\Request;
 
@@ -9,45 +11,50 @@ class AiController extends Controller
 {
     public function index()
     {
-        return view('ai.index');
+        $reports = AiReport::orderByDesc('created_at')->paginate(10);
+        return view('ai.index', compact('reports'));
     }
 
-    public function summary(Request $request, OllamaCloudService $ollama)
+    public function summary(Request $request, FinanceService $finance, OllamaCloudService $ollama)
     {
-        $data = [
-            'clients' => \App\Models\Client::all(),
-            'services' => \App\Models\Service::all(),
-            'revenues' => \App\Models\Revenue::all(),
-            'expenses' => \App\Models\Expense::all(),
-            'forecasts' => \App\Models\Forecast::all(),
-        ];
-        $summary = $ollama->summarize($data);
-        return view('ai.summary', compact('summary'));
+        $data = array_merge($finance->getKPIs(), [
+            'revenue_by_month' => $finance->getRevenueByMonth(6),
+            'expenses_by_month' => $finance->getExpensesByMonth(6),
+        ]);
+        $data['best_client'] = $data['best_client']?->name;
+        $data['best_service'] = $data['best_service']?->name;
+        $report = $ollama->generateSummary($data);
+        return redirect()->route('ai.show', $report->id)->with('success', 'Résumé généré avec succès.');
     }
 
-    public function analyze(Request $request, OllamaCloudService $ollama)
+    public function analysis(Request $request, FinanceService $finance, OllamaCloudService $ollama)
     {
-        $data = [
-            'clients' => \App\Models\Client::all(),
-            'services' => \App\Models\Service::all(),
-            'revenues' => \App\Models\Revenue::all(),
-            'expenses' => \App\Models\Expense::all(),
-            'forecasts' => \App\Models\Forecast::all(),
-        ];
-        $result = $ollama->analyzeFinances($data);
-        return view('ai.analyze', compact('result'));
+        $data = array_merge($finance->getKPIs(), [
+            'revenue_by_month' => $finance->getRevenueByMonth(12),
+            'expenses_by_month' => $finance->getExpensesByMonth(12),
+            'cashflow_by_month' => $finance->getCashflowByMonth(12),
+            'service_distribution' => $finance->getServiceDistribution(),
+        ]);
+        $data['best_client'] = $data['best_client']?->name;
+        $data['best_service'] = $data['best_service']?->name;
+        $report = $ollama->generateAnalysis($data);
+        return redirect()->route('ai.show', $report->id)->with('success', 'Analyse générée avec succès.');
     }
 
-    public function anomalies(Request $request, OllamaCloudService $ollama)
+    public function anomalies(Request $request, FinanceService $finance, OllamaCloudService $ollama)
     {
-        $data = [
-            'clients' => \App\Models\Client::all(),
-            'services' => \App\Models\Service::all(),
-            'revenues' => \App\Models\Revenue::all(),
-            'expenses' => \App\Models\Expense::all(),
-            'forecasts' => \App\Models\Forecast::all(),
-        ];
-        $anomalies = $ollama->detectAnomalies($data);
-        return view('ai.anomalies', compact('anomalies'));
+        $data = array_merge($finance->getKPIs(), [
+            'revenue_by_month' => $finance->getRevenueByMonth(6),
+            'expenses_by_month' => $finance->getExpensesByMonth(6),
+        ]);
+        $data['best_client'] = $data['best_client']?->name;
+        $data['best_service'] = $data['best_service']?->name;
+        $report = $ollama->detectAnomalies($data);
+        return redirect()->route('ai.show', $report->id)->with('success', 'Analyse des anomalies générée.');
+    }
+
+    public function show(AiReport $report)
+    {
+        return view('ai.show', compact('report'));
     }
 }

@@ -1,41 +1,48 @@
 @extends('layouts.app')
-
+@section('title', 'Nouveau service')
+@section('page-title', 'Nouveau service')
 @section('content')
-<div class="max-w-xl mx-auto py-8">
-    <h1 class="text-2xl font-bold mb-6">Ajouter un service</h1>
-    <form method="POST" action="{{ route('services.store') }}" class="bg-card rounded shadow p-6 space-y-4">
-        @csrf
-        <div>
-            <label class="block text-sm font-medium mb-1">Nom</label>
-            <input type="text" name="name" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Type</label>
-            <select name="type" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">
-                <option value="mensuel">Mensuel</option>
-                <option value="annuel">Annuel</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Prix (€)</label>
-            <input type="number" step="0.01" name="price" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Coût mensuel (€)</label>
-            <input type="number" step="0.01" name="monthly_cost" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Coût annuel (€)</label>
-            <input type="number" step="0.01" name="annual_cost" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Statut</label>
-            <select name="status" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">
-                <option value="actif">Actif</option>
-                <option value="inactif">Inactif</option>
-            </select>
-        </div>
-        <button type="submit" class="bg-primary hover:bg-accent text-white px-4 py-2 rounded">Créer</button>
-    </form>
+<div class="max-w-2xl">
+    <div class="card">
+        <form method="POST" action="{{ route('services.store') }}" class="space-y-4">
+            @csrf
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="label">Nom *</label>
+                    <input name="name" value="{{ old('name') }}" required class="input" placeholder="Hébergement VPS Pro">
+                </div>
+                <div>
+                    <label class="label">Type *</label>
+                    <select name="type" required class="input">
+                        <option value="monthly" {{ old('type') === 'monthly' ? 'selected' : '' }}>Mensuel</option>
+                        <option value="annual" {{ old('type') === 'annual' ? 'selected' : '' }}>Annuel</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Statut *</label>
+                    <select name="status" required class="input">
+                        <option value="actif" {{ old('status','actif') === 'actif' ? 'selected' : '' }}>Actif</option>
+                        <option value="inactif" {{ old('status') === 'inactif' ? 'selected' : '' }}>Inactif</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Prix (€) *</label>
+                    <input name="price" type="number" step="0.01" min="0" value="{{ old('price') }}" required class="input" placeholder="49.99">
+                </div>
+                <div>
+                    <label class="label">Coût interne (€)</label>
+                    <input name="cost" type="number" step="0.01" min="0" value="{{ old('cost') }}" class="input" placeholder="20.00">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="label">Description</label>
+                    <textarea name="description" rows="3" class="input" placeholder="Description du service...">{{ old('description') }}</textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="btn-primary">Créer le service</button>
+                <a href="{{ route('services.index') }}" class="btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

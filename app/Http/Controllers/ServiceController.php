@@ -9,15 +9,14 @@ class ServiceController extends Controller
 {
     public function index()
     {
-        $services = Service::all();
+        $services = Service::withCount('activeSubscriptions')->orderBy('name')->paginate(15);
         return view('services.index', compact('services'));
     }
 
     public function show(Service $service)
     {
-        $expenses = $service->expenses()->get();
-        $real_cost = $expenses->sum('amount');
-        return view('services.show', compact('service', 'expenses', 'real_cost'));
+        $service->load(['subscriptions.client', 'subscriptions.revenues']);
+        return view('services.show', compact('service'));
     }
 
     public function create()
@@ -28,15 +27,15 @@ class ServiceController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required',
-            'type' => 'required',
-            'price' => 'required|numeric',
-            'monthly_cost' => 'required|numeric',
-            'annual_cost' => 'required|numeric',
-            'status' => 'required',
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:monthly,annual',
+            'price' => 'required|numeric|min:0',
+            'cost' => 'nullable|numeric|min:0',
+            'status' => 'required|in:actif,inactif',
+            'description' => 'nullable|string',
         ]);
-        $service = Service::create($data);
-        return redirect()->route('services.index');
+        Service::create($data);
+        return redirect()->route('services.index')->with('success', 'Service créé avec succès.');
     }
 
     public function edit(Service $service)
@@ -47,20 +46,20 @@ class ServiceController extends Controller
     public function update(Request $request, Service $service)
     {
         $data = $request->validate([
-            'name' => 'sometimes',
-            'type' => 'sometimes',
-            'price' => 'sometimes|numeric',
-            'monthly_cost' => 'sometimes|numeric',
-            'annual_cost' => 'sometimes|numeric',
-            'status' => 'sometimes',
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:monthly,annual',
+            'price' => 'required|numeric|min:0',
+            'cost' => 'nullable|numeric|min:0',
+            'status' => 'required|in:actif,inactif',
+            'description' => 'nullable|string',
         ]);
         $service->update($data);
-        return redirect()->route('services.show', $service);
+        return redirect()->route('services.show', $service)->with('success', 'Service mis à jour.');
     }
 
     public function destroy(Service $service)
     {
         $service->delete();
-        return redirect()->route('services.index');
+        return redirect()->route('services.index')->with('success', 'Service supprimé.');
     }
 }

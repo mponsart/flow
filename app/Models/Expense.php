@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class Expense extends Model
 {
     protected $fillable = [
-        'client_id', 'service_id', 'category', 'amount', 'date', 'note'
+        'client_id', 'service_id', 'amount', 'category', 'date', 'description'
+    ];
+
+    protected $casts = [
+        'date' => 'date',
+        'amount' => 'decimal:2',
     ];
 
     public function client()

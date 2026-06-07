@@ -1,38 +1,46 @@
 @extends('layouts.app')
-
+@section('title', 'Nouveau client')
+@section('page-title', 'Nouveau client')
 @section('content')
-<div class="max-w-xl mx-auto py-8">
-    <h1 class="text-2xl font-bold mb-6">Ajouter un client</h1>
-    <form method="POST" action="{{ route('clients.store') }}" class="bg-card rounded shadow p-6 space-y-4">
-        @csrf
-        <div>
-            <label class="block text-sm font-medium mb-1">Nom</label>
-            <input type="text" name="name" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Email</label>
-            <input type="email" name="email" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Entreprise</label>
-            <input type="text" name="company" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Téléphone</label>
-            <input type="text" name="phone" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Statut</label>
-            <select name="status" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">
-                <option value="actif">Actif</option>
-                <option value="inactif">Inactif</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Notes</label>
-            <textarea name="notes" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2"></textarea>
-        </div>
-        <button type="submit" class="bg-primary hover:bg-accent text-white px-4 py-2 rounded">Créer</button>
-    </form>
+<div class="max-w-2xl">
+    <div class="card">
+        <form method="POST" action="{{ route('clients.store') }}" class="space-y-4">
+            @csrf
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="label">Nom *</label>
+                    <input name="name" value="{{ old('name') }}" required class="input" placeholder="Jean Dupont">
+                </div>
+                <div>
+                    <label class="label">Organisation</label>
+                    <input name="company" value="{{ old('company') }}" class="input" placeholder="Association XYZ">
+                </div>
+                <div>
+                    <label class="label">Email</label>
+                    <input name="email" type="email" value="{{ old('email') }}" class="input" placeholder="contact@asso.fr">
+                </div>
+                <div>
+                    <label class="label">Téléphone</label>
+                    <input name="phone" value="{{ old('phone') }}" class="input" placeholder="+33 6 00 00 00 00">
+                </div>
+                <div>
+                    <label class="label">Statut *</label>
+                    <select name="status" required class="input">
+                        <option value="actif" {{ old('status') === 'actif' ? 'selected' : '' }}>Actif</option>
+                        <option value="inactif" {{ old('status') === 'inactif' ? 'selected' : '' }}>Inactif</option>
+                        <option value="suspendu" {{ old('status') === 'suspendu' ? 'selected' : '' }}>Suspendu</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="label">Notes</label>
+                <textarea name="notes" rows="3" class="input" placeholder="Informations complémentaires...">{{ old('notes') }}</textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="btn-primary">Créer le client</button>
+                <a href="{{ route('clients.index') }}" class="btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

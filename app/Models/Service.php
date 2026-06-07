@@ -10,6 +10,11 @@ class Service extends Model
         'name', 'type', 'price', 'cost', 'status', 'description'
     ];
 
+    protected $casts = [
+        'price' => 'decimal:2',
+        'cost' => 'decimal:2',
+    ];
+
     public function subscriptions()
     {
         return $this->hasMany(Subscription::class);
@@ -27,11 +32,7 @@ class Service extends Model
 
     public function getTotalRevenueAttribute(): float
     {
-        return (float) $this->subscriptions()
-            ->with('revenues')
-            ->get()
-            ->flatMap->revenues
-            ->sum('amount');
+        return (float) Revenue::whereIn('subscription_id', $this->subscriptions()->pluck('id'))->sum('amount');
     }
 
     public function getSubscriberCountAttribute(): int
@@ -41,8 +42,8 @@ class Service extends Model
 
     public function getMonthlyRevenueAttribute(): float
     {
-        $monthly = $this->activeSubscriptions()->where('cycle', 'monthly')->count() * $this->price;
-        $annual = $this->activeSubscriptions()->where('cycle', 'annual')->count() * ($this->price / 12);
+        $monthly = $this->activeSubscriptions()->where('cycle', 'monthly')->count() * (float) $this->price;
+        $annual = $this->activeSubscriptions()->where('cycle', 'annual')->count() * ((float) $this->price / 12);
         return $monthly + $annual;
     }
 }

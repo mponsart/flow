@@ -1,35 +1,47 @@
 @extends('layouts.app')
-
+@section('title', 'Modifier la dépense')
+@section('page-title', 'Modifier la dépense')
 @section('content')
-<div class="container mx-auto py-8 max-w-lg">
-    <h1 class="text-2xl font-bold mb-6">Modifier la dépense</h1>
-    <form action="{{ route('expenses.update', $expense) }}" method="POST" class="bg-white shadow rounded-lg p-6">
-        @csrf
-        @method('PUT')
-        <div class="mb-4">
-            <label class="block text-gray-700">Service</label>
-            <input type="text" value="{{ $expense->service->name ?? '-' }}" class="form-input w-full bg-gray-100" disabled>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700">Catégorie</label>
-            <input type="text" name="category" value="{{ old('category', $expense->category) }}" class="form-input w-full" required>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700">Montant (€)</label>
-            <input type="number" step="0.01" name="amount" value="{{ old('amount', $expense->amount) }}" class="form-input w-full" required>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700">Date</label>
-            <input type="date" name="date" value="{{ old('date', $expense->date) }}" class="form-input w-full" required>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700">Note</label>
-            <textarea name="note" class="form-input w-full">{{ old('note', $expense->note) }}</textarea>
-        </div>
-        <div class="flex gap-4 mt-6">
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Enregistrer</button>
-            <a href="{{ route('expenses.show', $expense) }}" class="text-gray-600 hover:underline ml-auto">Annuler</a>
-        </div>
-    </form>
+<div class="max-w-2xl">
+    <div class="card">
+        <form method="POST" action="{{ route('expenses.update', $expense) }}" class="space-y-4">
+            @csrf @method('PUT')
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="label">Catégorie *</label>
+                    <select name="category" required class="input">
+                        @foreach($categories as $cat)
+                            <option value="{{ $cat }}" {{ $expense->category === $cat ? 'selected' : '' }}>{{ $cat }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Montant (€) *</label>
+                    <input name="amount" type="number" step="0.01" min="0" value="{{ $expense->amount }}" required class="input">
+                </div>
+                <div>
+                    <label class="label">Date *</label>
+                    <input name="date" type="date" value="{{ $expense->date->format('Y-m-d') }}" required class="input">
+                </div>
+                <div>
+                    <label class="label">Client</label>
+                    <select name="client_id" class="input">
+                        <option value="">Aucun</option>
+                        @foreach($clients as $client)
+                            <option value="{{ $client->id }}" {{ $expense->client_id == $client->id ? 'selected' : '' }}>{{ $client->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="label">Description</label>
+                    <input name="description" value="{{ $expense->description }}" class="input">
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="btn-primary">Enregistrer</button>
+                <a href="{{ route('expenses.index') }}" class="btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

@@ -2,86 +2,70 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Client;
 use App\Models\Expense;
 use App\Models\Service;
+use Illuminate\Http\Request;
 
 class ExpenseController extends Controller
 {
-    /**
-     * Display a listing of the expenses.
-     */
+    public const CATEGORIES = ['Hébergement', 'Infrastructure', 'Personnel', 'Marketing', 'Autre'];
+
     public function index()
     {
-        $expenses = Expense::with('service')->orderByDesc('date')->paginate(15);
+        $expenses = Expense::with(['client', 'service'])
+            ->orderByDesc('date')
+            ->paginate(15);
         return view('expenses.index', compact('expenses'));
     }
 
-    /**
-     * Show the form for creating a new expense.
-     */
-    public function create(Request $request)
+    public function create()
     {
-        $service_id = $request->get('service_id');
-        return view('expenses.create', compact('service_id'));
+        $clients = Client::orderBy('name')->get();
+        $services = Service::orderBy('name')->get();
+        $categories = self::CATEGORIES;
+        return view('expenses.create', compact('clients', 'services', 'categories'));
     }
 
-    /**
-     * Store a newly created expense.
-     */
     public function store(Request $request)
     {
         $data = $request->validate([
-            'service_id' => 'required|exists:services,id',
-            'category' => 'required',
-            'amount' => 'required|numeric',
+            'client_id' => 'nullable|exists:clients,id',
+            'service_id' => 'nullable|exists:services,id',
+            'amount' => 'required|numeric|min:0',
+            'category' => 'required|in:' . implode(',', self::CATEGORIES),
             'date' => 'required|date',
-            'note' => 'nullable',
+            'description' => 'nullable|string|max:500',
         ]);
-        \App\Models\Expense::create($data);
-        return redirect()->route('services.show', $data['service_id']);
+        Expense::create($data);
+        return redirect()->route('expenses.index')->with('success', 'Dépense ajoutée.');
     }
 
-    /**
-     * Display the specified expense.
-     */
-    public function show(string $id)
+    public function edit(Expense $expense)
     {
-        $expense = Expense::findOrFail($id);
-        return view('expenses.show', compact('expense'));
+        $clients = Client::orderBy('name')->get();
+        $services = Service::orderBy('name')->get();
+        $categories = self::CATEGORIES;
+        return view('expenses.edit', compact('expense', 'clients', 'services', 'categories'));
     }
 
-    /**
-     * Show the form for editing the specified expense.
-     */
-    public function edit(string $id)
+    public function update(Request $request, Expense $expense)
     {
-        $expense = Expense::findOrFail($id);
-        return view('expenses.edit', compact('expense'));
-    }
-
-    /**
-     * Update the specified expense.
-     */
-    public function update(Request $request, string $id)
-    {
-        $expense = Expense::findOrFail($id);
-        $expense->update($request->validate([
-            'category' => 'required',
-            'amount' => 'required|numeric',
+        $data = $request->validate([
+            'client_id' => 'nullable|exists:clients,id',
+            'service_id' => 'nullable|exists:services,id',
+            'amount' => 'required|numeric|min:0',
+            'category' => 'required|in:' . implode(',', self::CATEGORIES),
             'date' => 'required|date',
-            'note' => 'nullable',
-        ]));
-        return redirect()->route('expenses.show', $expense->id);
+            'description' => 'nullable|string|max:500',
+        ]);
+        $expense->update($data);
+        return redirect()->route('expenses.index')->with('success', 'Dépense mise à jour.');
     }
 
-    /**
-     * Remove the specified expense.
-     */
-    public function destroy(string $id)
+    public function destroy(Expense $expense)
     {
-        $expense = Expense::findOrFail($id);
         $expense->delete();
-        return redirect()->route('expenses.index');
+        return redirect()->route('expenses.index')->with('success', 'Dépense supprimée.');
     }
 }

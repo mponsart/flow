@@ -1,39 +1,46 @@
 @extends('layouts.app')
-
+@section('title', 'Modifier ' . $client->name)
+@section('page-title', 'Modifier ' . $client->name)
 @section('content')
-<div class="max-w-xl mx-auto py-8">
-    <h1 class="text-2xl font-bold mb-6">Modifier le client</h1>
-    <form method="POST" action="{{ route('clients.update', $client) }}" class="bg-card rounded shadow p-6 space-y-4">
-        @csrf
-        @method('PUT')
-        <div>
-            <label class="block text-sm font-medium mb-1">Nom</label>
-            <input type="text" name="name" value="{{ $client->name }}" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Email</label>
-            <input type="email" name="email" value="{{ $client->email }}" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Entreprise</label>
-            <input type="text" name="company" value="{{ $client->company }}" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Téléphone</label>
-            <input type="text" name="phone" value="{{ $client->phone }}" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Statut</label>
-            <select name="status" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">
-                <option value="actif" @if($client->status=='actif') selected @endif>Actif</option>
-                <option value="inactif" @if($client->status=='inactif') selected @endif>Inactif</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Notes</label>
-            <textarea name="notes" class="w-full rounded bg-zinc-900 border border-zinc-700 p-2">{{ $client->notes }}</textarea>
-        </div>
-        <button type="submit" class="bg-primary hover:bg-accent text-white px-4 py-2 rounded">Enregistrer</button>
-    </form>
+<div class="max-w-2xl">
+    <div class="card">
+        <form method="POST" action="{{ route('clients.update', $client) }}" class="space-y-4">
+            @csrf @method('PUT')
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="label">Nom *</label>
+                    <input name="name" value="{{ old('name', $client->name) }}" required class="input">
+                </div>
+                <div>
+                    <label class="label">Organisation</label>
+                    <input name="company" value="{{ old('company', $client->company) }}" class="input">
+                </div>
+                <div>
+                    <label class="label">Email</label>
+                    <input name="email" type="email" value="{{ old('email', $client->email) }}" class="input">
+                </div>
+                <div>
+                    <label class="label">Téléphone</label>
+                    <input name="phone" value="{{ old('phone', $client->phone) }}" class="input">
+                </div>
+                <div>
+                    <label class="label">Statut *</label>
+                    <select name="status" required class="input">
+                        <option value="actif" {{ $client->status === 'actif' ? 'selected' : '' }}>Actif</option>
+                        <option value="inactif" {{ $client->status === 'inactif' ? 'selected' : '' }}>Inactif</option>
+                        <option value="suspendu" {{ $client->status === 'suspendu' ? 'selected' : '' }}>Suspendu</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="label">Notes</label>
+                <textarea name="notes" rows="3" class="input">{{ old('notes', $client->notes) }}</textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="btn-primary">Enregistrer</button>
+                <a href="{{ route('clients.show', $client) }}" class="btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

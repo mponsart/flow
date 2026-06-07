@@ -7,66 +7,162 @@ use App\Models\Service;
 use App\Models\Subscription;
 use App\Models\Revenue;
 use App\Models\Expense;
-use App\Models\Forecast;
 use Illuminate\Support\Carbon;
 
 class FinanceService
 {
-    /**
-     * Calcule les principaux KPIs financiers pour le dashboard.
-     */
-    public function getDashboardKPIs(): array
+    public function getMRR(): float
+    {
+        $monthly = Subscription::where('status', 'actif')->where('cycle', 'monthly')
+            ->with('service')->get()->sum(fn($s) => (float) ($s->service->price ?? 0));
+        $annual = Subscription::where('status', 'actif')->where('cycle', 'annual')
+            ->with('service')->get()->sum(fn($s) => (float) ($s->service->price ?? 0) / 12);
+        return round($monthly + $annual, 2);
+    }
+
+    public function getARR(): float
+    {
+        return round($this->getMRR() * 12, 2);
+    }
+
+    public function getTotalRevenue(?Carbon $month = null): float
+    {
+        $query = Revenue::query();
+        if ($month) {
+            $query->whereMonth('date', $month->month)->whereYear('date', $month->year);
+        }
+        return (float) $query->sum('amount');
+    }
+
+    public function getTotalExpenses(?Carbon $month = null): float
+    {
+        $query = Expense::query();
+        if ($month) {
+            $query->whereMonth('date', $month->month)->whereYear('date', $month->year);
+        }
+        return (float) $query->sum('amount');
+    }
+
+    public function getNetProfit(?Carbon $month = null): float
+    {
+        return $this->getTotalRevenue($month) - $this->getTotalExpenses($month);
+    }
+
+    public function getMargin(?Carbon $month = null): float
+    {
+        $revenue = $this->getTotalRevenue($month);
+        if ($revenue <= 0) return 0;
+        return round(($this->getNetProfit($month) / $revenue) * 100, 2);
+    }
+
+    public function getGrowthRate(): float
     {
         $now = now();
-        $month = $now->month;
-        $year = $now->year;
+        $currentMonth = $this->getTotalRevenue($now);
+        $prevMonth = $this->getTotalRevenue($now->copy()->subMonth());
+        if ($prevMonth <= 0) return 0;
+        return round((($currentMonth - $prevMonth) / $prevMonth) * 100, 2);
+    }
 
-        $revenusMensuels = Revenue::whereMonth('date', $month)->whereYear('date', $year)->sum('amount');
-        $revenusAnnuels = Revenue::whereYear('date', $year)->sum('amount');
-        $MRR = Subscription::where('cycle', 'mensuel')->where('status', 'actif')->with('service')->get()->sum(fn($s) => $s->service->price ?? 0);
-        $ARR = Subscription::where('cycle', 'annuel')->where('status', 'actif')->with('service')->get()->sum(fn($s) => $s->service->price ?? 0);
-        $dépenses = Expense::whereYear('date', $year)->sum('amount');
-        $bénéfices = $revenusAnnuels - $dépenses;
-        $cashflow = $revenusAnnuels - $dépenses;
-        $trésorerie = $cashflow; // simplifié
-        $clientsActifs = Client::where('status', 'actif')->count();
-        $servicePlusRentable = Service::with('subscriptions')->get()->sortByDesc(function($service) {
-            return $service->subscriptions->sum(fn($s) => $s->service->price ?? 0) - $service->subscriptions->sum(fn($s) => $s->service->monthly_cost ?? 0);
-        })->first();
-        $clientPlusRentable = Client::with('revenues', 'expenses')->get()->sortByDesc(function($client) {
-            return $client->revenues->sum('amount') - $client->expenses->sum('amount');
-        })->first();
-        $croissanceRevenus = $this->getRevenueGrowth();
-        $margeMoyenne = $revenusAnnuels > 0 ? round((($revenusAnnuels - $dépenses) / $revenusAnnuels) * 100, 2) : 0;
+    public function getMostProfitableClient(): ?Client
+    {
+        return Client::with('revenues', 'expenses')->get()
+            ->sortByDesc(fn($c) => $c->total_revenue - $c->total_expenses)
+            ->first();
+    }
 
+    public function getMostProfitableService(): ?Service
+    {
+        return Service::with(['subscriptions.revenues'])->get()
+            ->sortByDesc(fn($s) => $s->total_revenue)
+            ->first();
+    }
+
+    public function getKPIs(): array
+    {
+        $now = now();
         return [
-            'revenus_mensuels' => $revenusMensuels,
-            'revenus_annuels' => $revenusAnnuels,
-            'MRR' => $MRR,
-            'ARR' => $ARR,
-            'dépenses' => $dépenses,
-            'bénéfices' => $bénéfices,
-            'cashflow' => $cashflow,
-            'trésorerie' => $trésorerie,
-            'clients_actifs' => $clientsActifs,
-            'service_plus_rentable' => $servicePlusRentable?->name,
-            'client_plus_rentable' => $clientPlusRentable?->name,
-            'croissance_revenus' => $croissanceRevenus,
-            'marge_moyenne' => $margeMoyenne,
+            'mrr' => $this->getMRR(),
+            'arr' => $this->getARR(),
+            'revenue_month' => $this->getTotalRevenue($now),
+            'expenses_month' => $this->getTotalExpenses($now),
+            'net_profit_month' => $this->getNetProfit($now),
+            'margin_month' => $this->getMargin($now),
+            'growth_rate' => $this->getGrowthRate(),
+            'best_client' => $this->getMostProfitableClient(),
+            'best_service' => $this->getMostProfitableService(),
         ];
     }
 
-    /**
-     * Calcule la croissance des revenus sur 2 mois.
-     */
-    public function getRevenueGrowth(): float
+    public function getRevenueByMonth(int $months = 12): array
     {
-        $now = now();
-        $moisActuel = Revenue::whereMonth('date', $now->month)->whereYear('date', $now->year)->sum('amount');
-        $moisPrecedent = Revenue::whereMonth('date', $now->subMonth()->month)->whereYear('date', $now->year)->sum('amount');
-        if ($moisPrecedent == 0) return 0;
-        return round((($moisActuel - $moisPrecedent) / $moisPrecedent) * 100, 2);
+        $result = [];
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $result[] = [
+                'label' => $month->format('M Y'),
+                'value' => $this->getTotalRevenue($month),
+            ];
+        }
+        return $result;
     }
 
-    // Autres méthodes de calculs financiers, rentabilité, projections, etc.
+    public function getExpensesByMonth(int $months = 12): array
+    {
+        $result = [];
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $result[] = [
+                'label' => $month->format('M Y'),
+                'value' => $this->getTotalExpenses($month),
+            ];
+        }
+        return $result;
+    }
+
+    public function getCashflowByMonth(int $months = 12): array
+    {
+        $result = [];
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $result[] = [
+                'label' => $month->format('M Y'),
+                'value' => $this->getNetProfit($month),
+            ];
+        }
+        return $result;
+    }
+
+    public function getServiceDistribution(): array
+    {
+        return Service::with(['subscriptions.revenues'])->get()
+            ->filter(fn($s) => $s->total_revenue > 0)
+            ->map(fn($s) => [
+                'label' => $s->name,
+                'value' => round($s->total_revenue, 2),
+            ])
+            ->values()
+            ->toArray();
+    }
+
+    public function getRecentTransactions(int $limit = 5): array
+    {
+        $revenues = Revenue::with('client')->orderByDesc('date')->limit($limit)->get()
+            ->map(fn($r) => [
+                'type' => 'revenue',
+                'label' => $r->description ?: 'Revenu',
+                'client' => $r->client?->name,
+                'amount' => (float) $r->amount,
+                'date' => $r->date,
+            ]);
+        $expenses = Expense::orderByDesc('date')->limit($limit)->get()
+            ->map(fn($e) => [
+                'type' => 'expense',
+                'label' => $e->description ?: $e->category,
+                'client' => null,
+                'amount' => -(float) $e->amount,
+                'date' => $e->date,
+            ]);
+        return $revenues->concat($expenses)->sortByDesc('date')->take($limit)->values()->toArray();
+    }
 }
